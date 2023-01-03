@@ -1,2 +1,13 @@
-data/Blue[[:space:]]Sky[[:space:]]Code[[:space:]]and[[:space:]]Inputs/SF_Logistic_Data.csv filter=lfs diff=lfs merge=lfs -text
+Fire_Department_Calls_for_Service.csv filter=lfs diff=lfs merge=lfs -text
+*.shp filter=lfs diff=lfs merge=lfs -text
+*.dbf filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+fewer_calls_for_service.csv filter=lfs diff=lfs merge=lfs -text
+sf_permits/geo_export_e492feba-11b7-4e0f-8354-4826ce5dd8dc.dbf filter=lfs diff=lfs merge=lfs -text
+Slopes[[:space:]]of[[:space:]]20%[[:space:]]Or[[:space:]]Greater/geo_export_2dd8ac56-99a0-4a45-ba46-c85a7407e3e5.dbf filter=lfs diff=lfs merge=lfs -text
+abag_building_permits/permits.dbf filter=lfs diff=lfs merge=lfs -text
+Census[[:space:]]2000_[[:space:]]Tracts[[:space:]]for[[:space:]]San[[:space:]]Francisco[[:space:]](no[[:space:]]water)/geo_export_4609700a-c230-4617-92b7-4ef34f23f741.dbf filter=lfs diff=lfs merge=lfs -text
+Department[[:space:]]of[[:space:]]Building[[:space:]]Inspection[[:space:]]Complaints[[:space:]](All[[:space:]]Divisions)/geo_export_4ca0f527-2767-499d-a8e0-879353561146.dbf filter=lfs diff=lfs merge=lfs -text
+Parcels[[:space:]][[:space:]][[:space:]]Active[[:space:]]and[[:space:]]Retired/geo_export_ab93a466-63d4-4c79-aecd-ab717844378d.dbf filter=lfs diff=lfs merge=lfs -text
+SF[[:space:]]Find[[:space:]]Neighborhoods/geo_export_2ecdf278-8615-4538-9268-0d4992d30e52.dbf filter=lfs diff=lfs merge=lfs -text
 .geofeather filter=lfs diff=lfs merge=lfs -text
