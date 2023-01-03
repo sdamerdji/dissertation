@@ -1,6 +1,8 @@
 # dissertation
 
-data sources:
+See draftproposal.pdf 
+
+Data sources:
 1. Parcel data - SF's bluesky panel data set
 2. Tax assessor data: https://www.sfassessor.org/news-information/property-data-0
 3. Fire data: https://data.sfgov.org/Public-Safety/Fire-Department-Calls-for-Service/nuek-vuh3
