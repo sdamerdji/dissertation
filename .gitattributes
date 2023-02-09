@@ -10,4 +10,5 @@ Census[[:space:]]2000_[[:space:]]Tracts[[:space:]]for[[:space:]]San[[:space:]]Fr
 Department[[:space:]]of[[:space:]]Building[[:space:]]Inspection[[:space:]]Complaints[[:space:]](All[[:space:]]Divisions)/geo_export_4ca0f527-2767-499d-a8e0-879353561146.dbf filter=lfs diff=lfs merge=lfs -text
 Parcels[[:space:]][[:space:]][[:space:]]Active[[:space:]]and[[:space:]]Retired/geo_export_ab93a466-63d4-4c79-aecd-ab717844378d.dbf filter=lfs diff=lfs merge=lfs -text
 SF[[:space:]]Find[[:space:]]Neighborhoods/geo_export_2ecdf278-8615-4538-9268-0d4992d30e52.dbf filter=lfs diff=lfs merge=lfs -text
+*geojson filter=lfs diff=lfs merge=lfs -text
 .geofeather filter=lfs diff=lfs merge=lfs -text
