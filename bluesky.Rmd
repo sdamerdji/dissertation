@@ -4,28 +4,68 @@ output: html_document
 date: "2022-12-14"
 ---
 
+## Setup
+
 ```{r}
-sf <- read.csv('./data/Blue Sky Code and Inputs/SF_Logistic_Data.csv')
+library(hdi)
+library(tidyverse)
+library(rsq)
+library(lme4)
+```
+
+```{r}
+trainX <- read.csv('./data/clean_data/trainX.csv')
+trainY <- read.csv('./data/clean_data/trainy.csv')
+```
+
+
+```{r}
+all(trainX$MapBlkLot_Master == trainY$MapBlkLot_Master)
+trainX <- select(trainX, -MapBlkLot_Master)
+trainY <- select(trainY, -MapBlkLot_Master)
+df <- cbind(trainX, trainY)
+```
+
+
+
+### EDA
+
+```{r}
+colnames(df)
+
+ggplot(df) +
+  geom_point(aes(x=YRBLT, y=Developed))
 
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-sf %>%
-
+```{r}
+range(df$YRBLT)
 ```
 
-## Including Plots
+### Model fitting
 
-You can also embed plots, for example:
+Fit high dimensional multi-level effect model.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+mod <- glm(Developed ~ . - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), family='binomial', df)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+I should try using forward selection.
+```{r}
+summary(mod)
+```
+
+```{r}
+rsq.kl(mod)
+```
+
+```{r}
+mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), 
+              family='binomial', 
+              df)
+```
+
+```{r}
+summary(mod2)
+```
+
