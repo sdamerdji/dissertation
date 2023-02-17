@@ -14,49 +14,72 @@ library(lme4)
 ```
 
 ```{r}
-trainX <- read.csv('./data/clean_data/trainX.csv')
-trainY <- read.csv('./data/clean_data/trainy.csv')
+df <- read.csv('./cleaned_rhna4_data.csv')
+
+colnames(df)
+
+df <- select(df, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
 ```
 
+This is 555 California Street, the fourth largest skyscraper in SF. So the large land value and property values do not seem to be bogus.
+```{r}
+df[df$RP1LNDVAL == 256020000,]
+```
 
 ```{r}
-all(trainX$MapBlkLot_Master == trainY$MapBlkLot_Master)
-trainX <- select(trainX, -MapBlkLot_Master)
-trainY <- select(trainY, -MapBlkLot_Master)
-df <- cbind(trainX, trainY)
+
+ggplot(df) +
+  geom_violin(aes(x=Developed, y=RP1LNDVAL), alpha=.1)
 ```
 
+```{r}
+table(df$RP1STACDE)
+```
 
+```{r}
+df <- df[df$ROOMS >= 0,]
+```
+
+```{r}
+df <- df[df$FBA >= 0,]
+summary(df)
+```
 
 ### EDA
 
 ```{r}
-colnames(df)
 
 ggplot(df) +
-  geom_point(aes(x=YRBLT, y=Developed))
+  geom_point(aes(x=SQFT, y=area), alpha=.1)
+
+df <- df[df$YRBLT <= 2023,]
+
 
 ```
 
-```{r}
-range(df$YRBLT)
-```
 
 ### Model fitting
 
 Fit high dimensional multi-level effect model.
 
 ```{r}
-mod <- glm(Developed ~ . - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), family='binomial', df)
+df$Developed <- df$Developed > 0
 ```
 
 I should try using forward selection.
 ```{r}
-summary(mod)
+mod.init <- glm(Developed ~ 1, family='binomial', select(df, -ZONE))
+mod.all <- glm(Developed ~ . -neighborhood, family='binomial', select(df, -ZONE, -EXEMPTYPE, -RP1PPTVAL, -RP1FXTVAL, -RP1EXMVL2, -RP1CLACDE))
+step.mod <- step(mod.init, direction='forward', scope=formula(mod.all))
 ```
 
 ```{r}
-rsq.kl(mod)
+summary(step.mod)
+
+```
+
+```{r}
+rsq.kl(step.mod)
 ```
 
 ```{r}
@@ -65,7 +88,5 @@ mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residenti
               df)
 ```
 
-```{r}
-summary(mod2)
-```
+
 

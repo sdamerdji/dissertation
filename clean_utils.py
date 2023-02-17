@@ -43,7 +43,7 @@ def get_rhna4_parcels(df):
     df = df[~(df.date_rec_d.dt.year < rhna4start)]
     df = df[~(df.date_rec_a.dt.year >= rhna4end)]
     df = df[~(df.date_map_a.dt.year >= rhna4end)]
-    return df
+    return df.copy()
 
 def get_rhna5_parcels(df):
     """Remove parcels deleted before RHNA4 or added after RHNA4."""
@@ -52,7 +52,56 @@ def get_rhna5_parcels(df):
     df = df[~(df.date_rec_d.dt.year < rhna5start)]
     df = df[~(df.date_rec_a.dt.year >= (rhna5start + 8))]
     df = df[~(df.date_map_a.dt.year >= (rhna5start + 8))]
+    return df.copy()
+
+def get_site_inventory_feature(df, sites, cycle=4):
+    rhna = sites[sites['rhnacyc'] == ('RHNA' + str(cycle))]
+    rhna = rhna[rhna.jurisdict == 'San Francisco']
+
+    rhna.locapn = rhna.locapn.str.split('/').str.join('')
+    rhna.apn = rhna.apn.str.split('/').str.join('')
+
+    predictedSites = np.logical_or(df.MapBlkLot_Master.isin(rhna.locapn.values),
+                                   df.MapBlkLot_Master.isin(rhna.apn.values))
+    df['inInventory'] = predictedSites
     return df
+
+def merge_tax(df, tax, cycle=4, parcels=None):
+    
+    # Clean tax identifier
+    def clean_apn(apn):
+        apn = ''.join(str(apn).split(' '))
+        return apn
+    tax['MapBlkLot_Master'] = tax.RP1PRCLID.apply(clean_apn)
+    
+    # Merge on blocklot first
+    full_df = df.merge(tax, how='inner', on='MapBlkLot_Master')
+    
+    # Get a geo version of the tax data. (This can be improved by using geojson on SF OpenData.)
+    if parcels is None:
+        parcels = get_parcels()
+    allParcels = parcels
+    #if cycle == 4:
+    #    allParcels = get_rhna4_parcels(parcels)
+    #else:
+    #    allParcels = get_rhna5_parcels(parcels)
+    allParcels2 = allParcels.dissolve(by='mapblklot')
+    allParcels2 = allParcels2[['geometry']]
+    taxGeo = allParcels2.merge(tax,
+                               how='inner',
+                               right_on='MapBlkLot_Master',
+                               left_on='mapblklot',
+                               validate='one_to_one')
+
+    # Merge on geometry
+    cantID = df[~df.MapBlkLot_Master.isin(tax.MapBlkLot_Master)]
+    canID = gpd.sjoin(cantID, taxGeo, how="inner", predicate='intersects')
+    canID = canID.drop_duplicates('MapBlkLot_Master_left')
+    canID['MapBlkLot_Master'] = canID['MapBlkLot_Master_left']
+    canID = canID.drop(['MapBlkLot_Master_left', 'MapBlkLot_Master_right', 'index_right'], axis=1)
+    
+    # Return concatenation of two merges
+    return pd.concat((full_df, canID), axis=0)
 
 def transform_bluesky_to_geospatial(bluesky, cycle=4):
     """Return a geodataframe from bluesky. Adds columns for mapblklot, blklot,
