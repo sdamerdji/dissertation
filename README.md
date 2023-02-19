@@ -9,3 +9,7 @@ Data sources:
 4. Construction cost data: https://flintbuilders.com/wp-content/uploads/2022/02/City-Cost-Index-San-Francisco-As-of-December-2021-_-Engineering-News-Record.pdf
 5. Rent data: ZHVI All Homes- Top Tier Time Series ($) at city level https://www.zillow.com/research/data/
 6. Interest rates: Wharton Research Data Services Interest Rates (Federal Reserve, H15 report) all variables selected from Jan 2000 to March 2020.
+
+# Side-project
+
+See do_local_planners_outperform_a_model.pdf
