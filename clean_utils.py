@@ -41,8 +41,8 @@ def get_rhna4_parcels(df):
     clean_dates(df)
     df = df[~(df.date_map_d.dt.year < rhna4start)]
     df = df[~(df.date_rec_d.dt.year < rhna4start)]
-    df = df[~(df.date_rec_a.dt.year >= rhna4end)]
-    df = df[~(df.date_map_a.dt.year >= rhna4end)]
+    df = df[~(df.date_rec_a.dt.year >= (rhna4start + 8))]
+    df = df[~(df.date_map_a.dt.year >= (rhna4start + 8))]
     return df.copy()
 
 def get_rhna5_parcels(df):

@@ -6,65 +6,105 @@ date: "2022-12-14"
 
 ## Setup
 
-```{r}
+```{r, warning=FALSE}
 library(hdi)
 library(tidyverse)
 library(rsq)
 library(lme4)
+library(caret)
 ```
 
 ```{r}
-df <- read.csv('./cleaned_rhna4_data.csv')
+df4 <- read.csv('./cleaned_rhna4_data.csv')
+df5 <- read.csv('./cleaned_rhna5_data.csv')
 
-colnames(df)
-
-df <- select(df, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
+df4 <- select(df4, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
+df5 <- select(df5, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
 ```
+
+```{r}
+nrow(df4)
+nrow(df5)
+
+```
+### Illogical Values
+
+```{r}
+df4$Developed <- df4$Developed > 0
+df4 <- df4[df4$ROOMS >= 0,]
+df4 <- df4[df4$FBA >= 0,]
+df4 <- df4[df4$YRBLT <= 2023,]
+summary(df4)
+```
+
+```{r}
+df5$Developed <- df5$Developed > 0
+df5 <- df5[df5$ROOMS >= 0,]
+df5 <- df5[df5$FBA >= 0,]
+df5 <- df5[df5$YRBLT <= 2023,]
+summary(df5)
+```
+
+### Exploratory Data Analysis
 
 This is 555 California Street, the fourth largest skyscraper in SF. So the large land value and property values do not seem to be bogus.
+
 ```{r}
-df[df$RP1LNDVAL == 256020000,]
+df4[df4$RP1LNDVAL == max(df4$RP1LNDVAL),]
 ```
 
 ```{r}
-
-ggplot(df) +
-  geom_violin(aes(x=Developed, y=RP1LNDVAL), alpha=.1)
+ggplot(df4) + 
+  geom_histogram(aes(log(1 + ROOMS)))
 ```
 
 ```{r}
-table(df$RP1STACDE)
+ggplot(df4) + 
+  geom_histogram(aes(RP1EXMVL1))
+```
+
+
+```{r}
+ggplot(df4) + 
+  geom_histogram(aes(log(1 + FBA)))
+```
+
+
+```{r}
+ggplot(df4) +
+  geom_violin(aes(x=Developed, y=log(RECC)), alpha=.1)
+```
+
+
+```{r}
+ggplot(df4) +
+  geom_histogram(aes(x=log(RP1LNDVAL + 1))) +
+  facet_grid(Developed ~ ., scales = "free_y")
 ```
 
 ```{r}
-df <- df[df$ROOMS >= 0,]
+ggplot(df4) +
+  geom_histogram(aes(x=log(RP1IMPVAL + 1))) +
+  facet_grid(Developed ~ ., scales = "free_y")
 ```
 
+
 ```{r}
-df <- df[df$FBA >= 0,]
-summary(df)
+table(df4$RP1STACDE)
 ```
+
 
 ### EDA
 
 ```{r}
-
 ggplot(df) +
   geom_point(aes(x=SQFT, y=area), alpha=.1)
-
-df <- df[df$YRBLT <= 2023,]
-
 
 ```
 
 
 ### Model fitting
 
-Fit high dimensional multi-level effect model.
-
-```{r}
-df$Developed <- df$Developed > 0
-```
 
 I should try using forward selection.
 ```{r}
@@ -82,10 +122,81 @@ summary(step.mod)
 rsq.kl(step.mod)
 ```
 
+### Taking log transforms of land value and improvement value helps.
+
 ```{r}
+mod.log <- glm(Developed ~ general_use_code + district + Upzone_Ratio + 
+                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                 pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
+                 log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
+                 DEPTH  + Historic + inInventory + Residential_Dummy + 
+                 Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
+    family = "binomial", data = select(df4, -ZONE))
+
+rsq.kl(mod.log)
+
+summary(mod.log)
+```
+
+```{r}
+caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df4, -ZONE), type="response") > 0.5, TRUE, FALSE)),  
+                       reference=as.factor(df4$Developed))
+
+```
+
+```{r}
+caret::confusionMatrix(data=as.factor(as.logical(df4$inInventory)),  
+                       reference=as.factor(df4$Developed))
+
+```
+
+
+```{r}
+as.logical(round(predict(mod.log, select(df5, -ZONE), type="response")[1:5]))
+as.factor(df5$Developed)
+
+caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df5, -ZONE), type="response") > 0.5, TRUE, FALSE)),  
+                       reference=as.factor(df5$Developed))
+```
+
+
+```{r}
+
+caret::confusionMatrix(data=as.factor(as.logical(df5$inInventory)),
+                       reference=as.factor(df5$Developed))
+
+```
+
+
+```{r}
+hist(mod.log$fitted.values)
+ggplot(df, aes(x = mod.log$fitted.values)) +
+  geom_histogram() +
+  scale_y_log10()
+
+```
+
+```{r}
+range(mod.log$fitted.values)
+```
+
+```{r, eval=F}
 mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), 
               family='binomial', 
               df)
+
+
+mod.log.er <- glmer(Developed ~ general_use_code + (1 | district) + Upzone_Ratio + 
+                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                 pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
+                 log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
+                 DEPTH + Historic + inInventory + Residential_Dummy + 
+                 Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
+                 family = "binomial", data = select(df, -ZONE))
+
+summary(mod.log.er)
 ```
 
 
