@@ -177,9 +177,6 @@ ggplot(df, aes(x = mod.log$fitted.values)) +
 
 ```
 
-```{r}
-range(mod.log$fitted.values)
-```
 
 ```{r, eval=F}
 mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), 

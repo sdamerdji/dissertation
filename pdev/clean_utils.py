@@ -13,7 +13,7 @@ def get_parcels():
     """
     global ALLPARCELS 
     if ALLPARCELS is None:
-        ALLPARCELS = gpd.read_file('./data/Parcels   Active and Retired/parcels.shp')
+        ALLPARCELS = gpd.read_file('../data/Parcels   Active and Retired/parcels.shp')
     return ALLPARCELS
 
 def get_dbi_data():
@@ -21,7 +21,7 @@ def get_dbi_data():
     """
     global DBIPERMITS 
     if DBIPERMITS is None:
-        DBIPERMITS = gpd.read_file('./data/Building Permits.geojson')
+        DBIPERMITS = gpd.read_file('../data/Building Permits.geojson')
     return DBIPERMITS
 
 def clean_dates(df):
