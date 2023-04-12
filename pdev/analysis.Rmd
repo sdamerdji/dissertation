@@ -6,7 +6,7 @@ date: "2022-12-14"
 
 ## Setup
 
-```{r, warning=FALSE}
+```{r warning=FALSE, message=FALSE}
 library(hdi)
 library(tidyverse)
 library(rsq)
@@ -18,8 +18,10 @@ library(caret)
 df4 <- read.csv('./cleaned_rhna4_data.csv')
 df5 <- read.csv('./cleaned_rhna5_data.csv')
 
-df4 <- select(df4, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
-df5 <- select(df5, -X, -MapBlkLot_Master, -mapblklot, -blklot, -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
+df4 <- select(df4, -X, -MapBlkLot_Master, -mapblklot, -blklot,
+              -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
+df5 <- select(df5, -X, -MapBlkLot_Master, -mapblklot, -blklot,
+              -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
 ```
 
 ```{r}
@@ -27,7 +29,8 @@ nrow(df4)
 nrow(df5)
 
 ```
-### Illogical Values
+
+### Remove illogical Values
 
 ```{r}
 df4$Developed <- df4$Developed > 0
@@ -53,36 +56,30 @@ This is 555 California Street, the fourth largest skyscraper in SF. So the large
 df4[df4$RP1LNDVAL == max(df4$RP1LNDVAL),]
 ```
 
-```{r}
+```{r message=FALSE}
 ggplot(df4) + 
   geom_histogram(aes(log(1 + ROOMS)))
 ```
 
-```{r}
+```{r message=FALSE}
 ggplot(df4) + 
   geom_histogram(aes(RP1EXMVL1))
 ```
 
 
-```{r}
+```{r message=FALSE}
 ggplot(df4) + 
   geom_histogram(aes(log(1 + FBA)))
 ```
 
 
-```{r}
-ggplot(df4) +
-  geom_violin(aes(x=Developed, y=log(RECC)), alpha=.1)
-```
-
-
-```{r}
+```{r message=FALSE}
 ggplot(df4) +
   geom_histogram(aes(x=log(RP1LNDVAL + 1))) +
   facet_grid(Developed ~ ., scales = "free_y")
 ```
 
-```{r}
+```{r message=FALSE}
 ggplot(df4) +
   geom_histogram(aes(x=log(RP1IMPVAL + 1))) +
   facet_grid(Developed ~ ., scales = "free_y")
@@ -97,8 +94,8 @@ table(df4$RP1STACDE)
 ### EDA
 
 ```{r}
-ggplot(df) +
-  geom_point(aes(x=SQFT, y=area), alpha=.1)
+ggplot(df4) +
+  geom_point(aes(x=SQFT, y=LAREA), alpha=.1)
 
 ```
 
@@ -106,19 +103,20 @@ ggplot(df) +
 ### Model fitting
 
 
-I should try using forward selection.
-```{r}
-mod.init <- glm(Developed ~ 1, family='binomial', select(df, -ZONE))
-mod.all <- glm(Developed ~ . -neighborhood, family='binomial', select(df, -ZONE, -EXEMPTYPE, -RP1PPTVAL, -RP1FXTVAL, -RP1EXMVL2, -RP1CLACDE))
+I used forward selection to select variables, but it's turned off for creating this R markdown file since it takes an hour to run.
+
+```{r, eval=F}
+mod.init <- glm(Developed ~ 1, family='binomial', select(df4, -ZONE))
+mod.all <- glm(Developed ~ . -neighborhood, family='binomial', select(df4, -ZONE, -EXEMPTYPE, -RP1PPTVAL, -RP1FXTVAL, -RP1EXMVL2, -RP1CLACDE))
 step.mod <- step(mod.init, direction='forward', scope=formula(mod.all))
 ```
 
-```{r}
+```{r, eval=F}
 summary(step.mod)
 
 ```
 
-```{r}
+```{r, eval=F}
 rsq.kl(step.mod)
 ```
 
@@ -132,7 +130,7 @@ mod.log <- glm(Developed ~ general_use_code + district + Upzone_Ratio +
                  log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
                  DEPTH  + Historic + inInventory + Residential_Dummy + 
                  Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
-    family = "binomial", data = select(df4, -ZONE))
+    family = "binomial", data = df4)
 
 rsq.kl(mod.log)
 
@@ -153,10 +151,12 @@ caret::confusionMatrix(data=as.factor(as.logical(df4$inInventory)),
 
 
 ```{r}
-as.logical(round(predict(mod.log, select(df5, -ZONE), type="response")[1:5]))
-as.factor(df5$Developed)
 
-caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df5, -ZONE), type="response") > 0.5, TRUE, FALSE)),  
+caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, 
+                                                     select(df5, -ZONE), 
+                                                     type="response") > 0.5,
+                                             TRUE,
+                                             FALSE)),  
                        reference=as.factor(df5$Developed))
 ```
 
@@ -169,19 +169,21 @@ caret::confusionMatrix(data=as.factor(as.logical(df5$inInventory)),
 ```
 
 
-```{r}
+```{r message=FALSE}
 hist(mod.log$fitted.values)
-ggplot(df, aes(x = mod.log$fitted.values)) +
+ggplot(df4, aes(x = mod.log$fitted.values)) +
   geom_histogram() +
   scale_y_log10()
 
 ```
 
+# Mixed effects
 
+Turned off temporarily since this is something to evaluate at a later stage
 ```{r, eval=F}
 mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), 
               family='binomial', 
-              df)
+              df4)
 
 
 mod.log.er <- glmer(Developed ~ general_use_code + (1 | district) + Upzone_Ratio + 
@@ -191,7 +193,7 @@ mod.log.er <- glmer(Developed ~ general_use_code + (1 | district) + Upzone_Ratio
                  log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
                  DEPTH + Historic + inInventory + Residential_Dummy + 
                  Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
-                 family = "binomial", data = select(df, -ZONE))
+                 family = "binomial", data = select(df4, -ZONE))
 
 summary(mod.log.er)
 ```
