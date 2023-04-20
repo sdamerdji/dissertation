@@ -185,35 +185,26 @@ def get_dbi_permits(cycle=4, filter_for_construction=True):
     """Get permits that count towards RHNA from DBI Permits."""
     dbi = get_dbi_data()
     clean_dates(dbi)
-    if 'units' not in dbi.columns:
-        dbi['units'] = dbi.proposed_units.fillna(0).astype(float) - dbi.existing_units.fillna(0).astype(float)
-        dbi['blocklot'] = dbi['block'].astype(str) + dbi['lot'].astype(str)
-        dbi['permit_type'] = dbi['permit_type'].astype(int)
-        dbi['na_existing_units'] = dbi['existing_units'].isna()
-
-    # In old code, there may have been two bugs. One, I didn't caste permit type as int first. Second, & hass higher precedence
-    # so first line needs parentheses
-    if filter_for_construction:
-        relevant_uses = [
-            'apartments', '1 family dwelling', '2 family dwelling',
-            'residential hotel', 'misc group residns.', 'artist live/work',
-            'convalescent home', 'accessory cottage', 'nursing home non amb',
-            'orphanage', 'r-3(dwg) nursing', 'nursing home gt 6', 
-            'day care home gt 12', 'day care home lt 7', 'day care home 7 - 12',
-            'nursing home lte 6'
-        ]
-        rhna_permits = dbi[
-            (dbi['units'] > 0)
-            & (dbi['proposed_use'].isin(relevant_uses))
-            & (dbi['permit_type'].isin([1, 2, 3, 8]))
-        ].copy()
-    else:
-        rhna_permits = dbi.copy()    
     
-    # Let's try without the below
-    # rhna_permits.query('not (`permit_type` == 8 and na_existing_units)', inplace=True)
-    # rhna_permits.query('not (`permit_type` == 3 and na_existing_units)', inplace=True)
+    dbi['units'] = dbi.proposed_units.fillna(0).astype(float) - dbi.existing_units.fillna(0).astype(float)
+    dbi['blocklot'] = dbi['block'].astype(str) + dbi['lot'].astype(str)
+    dbi['permit_type'] = dbi['permit_type'].astype(int)
+    dbi['na_existing_units'] = dbi['existing_units'].isna()
 
+    relevant_uses = [
+        'apartments', '1 family dwelling', '2 family dwelling',
+        'residential hotel', 'misc group residns.', 'artist live/work',
+        'convalescent home', 'accessory cottage', 'nursing home non amb',
+        'orphanage', 'r-3(dwg) nursing', 'nursing home gt 6', 
+        'day care home gt 12', 'day care home lt 7', 'day care home 7 - 12',
+        'nursing home lte 6'
+    ]
+    rhna_permits = dbi[
+        (dbi['units'] > 0)
+        & (dbi['proposed_use'].isin(relevant_uses))
+        & (dbi['permit_type'].isin([1, 2, 3, 8]))
+    ].copy()
+    
     rhna_permits = rhna_permits.rename(columns={'Location': 'geometry'})
     
     cycle_start = {3: rhna3start, 4: rhna4start, 5: rhna5start}
