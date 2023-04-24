@@ -12,22 +12,23 @@ library(tidyverse)
 library(rsq)
 library(lme4)
 library(caret)
+library(corrr)
+library(knitr) 
 ```
 
 ```{r}
 df4 <- read.csv('./cleaned_rhna4_data.csv')
-df5 <- read.csv('./cleaned_rhna5_data.csv')
 
-df4 <- select(df4, -X, -MapBlkLot_Master, -mapblklot, -blklot,
-              -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
-df5 <- select(df5, -X, -MapBlkLot_Master, -mapblklot, -blklot,
-              -active, -geometry, -PROPLOC, -RP1PRCLID, -RP1TRACDE)
+df4 <- select(df4, -MapBlkLot_Master)
 ```
 
 ```{r}
 nrow(df4)
-nrow(df5)
 
+```
+
+```{r}
+df4
 ```
 
 ### Remove illogical Values
@@ -37,20 +38,79 @@ df4$Developed <- df4$Developed > 0
 df4 <- df4[df4$ROOMS >= 0,]
 df4 <- df4[df4$FBA >= 0,]
 df4 <- df4[df4$YRBLT <= 2023,]
-summary(df4)
+
+# There are 19 properties supposedly built before SF's founding. I set to year 0 
+df4[0 < df4$YRBLT & df4$YRBLT <= 1776,]$YRBLT <- 0
+
+df4['yearBuiltMissing'] <- df4$YRBLT == 0
 ```
 
+### Ensure categorical variables are treated appropriately.
+
 ```{r}
-df5$Developed <- df5$Developed > 0
-df5 <- df5[df5$ROOMS >= 0,]
-df5 <- df5[df5$FBA >= 0,]
-df5 <- df5[df5$YRBLT <= 2023,]
-summary(df5)
+# Area code that affects taxes
+df4$RP1TRACDE <- as.factor(df4$RP1TRACDE)
+
+# Property records are split up into volumes for organizational purposes.
+# This is likely highly correlated with neighborhoods or census tracts.
+df4$RP1VOLUME <- as.factor(df4$RP1VOLUME)
+
+df4$inInventory <- ifelse(df4$inInventory == 'True', 1, 0)
+```
+
+### Baseline model
+
+```{r}
+base.mod <- glm(Developed ~ inInventory, df4, family='binomial')
+summary(base.mod)
 ```
 
 ### Exploratory Data Analysis
 
+
+```{r}
+lapply(df4, min)
+```
+
+```{r, results='asis'}
+corr_with_outcome <- df4 %>%
+  correlate() %>%
+  focus(Developed) %>%
+  arrange(desc(abs(Developed)))
+
+tex_df <- kable(corr_with_outcome,
+             format='latex',
+             digits=3,
+             caption = "Pearson correlation coefficient with outcome variable, development.")
+
+tex_df
+
+corr_with_outcome
+```
+
+
+```{r, results='asis'}
+
+
+
+corr_with_treat <- df4 %>%
+  correlate() %>%
+  focus(inInventory) %>%
+  arrange(desc(abs(inInventory)))
+
+tex_df2 <- kable(corr_with_treat,
+             format='latex',
+             digits=3,
+             caption = "Pearson correlation coefficient with treatment variable, inventory site selection")
+
+tex_df2
+
+
+```
+
+
 This is 555 California Street, the fourth largest skyscraper in SF. So the large land value and property values do not seem to be bogus.
+
 
 ```{r}
 df4[df4$RP1LNDVAL == max(df4$RP1LNDVAL),]
@@ -93,12 +153,65 @@ table(df4$RP1STACDE)
 
 ### EDA
 
+
+
+RP1LNDVAL 0.057
+zp DensRestMulti 0.045
+owner occ -0.042
+inInventory
+
 ```{r}
 ggplot(df4) +
   geom_point(aes(x=SQFT, y=LAREA), alpha=.1)
 
 ```
 
+This is a bad plot that distorts proportions.
+```{r}
+ggplot(df4) +
+  geom_boxplot(aes(x=Developed, y=Upzone_Ratio)) +
+  scale_y_log10()
+
+ggsave('./figures/upzone_ratio_dev_boxplot.png', width=4, height=4)
+```
+```{r}
+ggplot(df4,aes(x = Residential_Dummy,fill = Developed)) + 
+    geom_bar(position = "fill")
+
+ggsave('./figures/residenital_vs_dev.png', height=4, width=4)
+```
+
+```{r}
+ggplot(df4[df4$YRBLT > 0,]) +
+  geom_boxplot(aes(x=Developed, y=YRBLT))
+ggsave('./figures/yrblt_vs_dev.png', height=4, width=4)
+
+```
+```{r}
+ggplot(df4) +
+  geom_boxplot(aes(x=Developed, y=yearBuiltMissing))
+
+
+ggplot(df4, aes(yearBuiltMissing)) +
+  geom_bar(aes(fill = Developed)) +
+  scale_y_log10()
+
+ggsave('./figures/yrblt_miss_vs_dev.png', height=4, width=4)
+
+```
+
+
+```{r}
+ggplot(df4) +
+  geom_boxplot(aes(x=Developed, y=log1p(Envelope_1000)))
+ggsave('./figures/env_dev.png', height=4, width=4)
+```
+
+```{r}
+ggplot(df4) +
+  geom_boxplot(aes(x=Developed, y=log1p(RP1LNDVAL)))
+ggsave('./figures/landval_dev.png', height=4, width=4)
+```
 
 ### Model fitting
 
@@ -146,25 +259,6 @@ caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df4, -ZONE)
 ```{r}
 caret::confusionMatrix(data=as.factor(as.logical(df4$inInventory)),  
                        reference=as.factor(df4$Developed))
-
-```
-
-
-```{r}
-
-caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, 
-                                                     select(df5, -ZONE), 
-                                                     type="response") > 0.5,
-                                             TRUE,
-                                             FALSE)),  
-                       reference=as.factor(df5$Developed))
-```
-
-
-```{r}
-
-caret::confusionMatrix(data=as.factor(as.logical(df5$inInventory)),
-                       reference=as.factor(df5$Developed))
 
 ```
 
