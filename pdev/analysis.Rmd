@@ -7,13 +7,15 @@ date: "2022-12-14"
 ## Setup
 
 ```{r warning=FALSE, message=FALSE}
-library(hdi)
+library(gt)  
+library(gtsummary)
 library(tidyverse)
 library(rsq)
 library(lme4)
 library(caret)
 library(corrr)
 library(knitr) 
+
 ```
 
 ```{r}
@@ -23,7 +25,11 @@ df4 <- select(df4, -MapBlkLot_Master)
 ```
 
 ```{r}
-nrow(df4)
+ncol(df4)
+
+1 - mean(df4$Developed)
+
+1 - mean(df4$inInventory)
 
 ```
 
@@ -43,6 +49,7 @@ df4 <- df4[df4$YRBLT <= 2023,]
 df4[0 < df4$YRBLT & df4$YRBLT <= 1776,]$YRBLT <- 0
 
 df4['yearBuiltMissing'] <- df4$YRBLT == 0
+
 ```
 
 ### Ensure categorical variables are treated appropriately.
@@ -56,13 +63,22 @@ df4$RP1TRACDE <- as.factor(df4$RP1TRACDE)
 df4$RP1VOLUME <- as.factor(df4$RP1VOLUME)
 
 df4$inInventory <- ifelse(df4$inInventory == 'True', 1, 0)
+df4$entirely_steep_lot <- ifelse(df4$entirely_steep_lot == 'True', 1, 0)
+df4$partly_steep_lot <- ifelse(df4$partly_steep_lot == 'True', 1, 0)
+
 ```
 
 ### Baseline model
 
-```{r}
+```{r, results='asis'}
 base.mod <- glm(Developed ~ inInventory, df4, family='binomial')
 summary(base.mod)
+
+base.mod.latex <- base.mod %>%
+  tbl_regression(exponentiate = TRUE, intercept=TRUE) %>%
+  as_gt() %>%
+  gt::as_latex()
+ 
 ```
 
 ### Exploratory Data Analysis
@@ -192,9 +208,8 @@ ggplot(df4) +
   geom_boxplot(aes(x=Developed, y=yearBuiltMissing))
 
 
-ggplot(df4, aes(yearBuiltMissing)) +
-  geom_bar(aes(fill = Developed)) +
-  scale_y_log10()
+ggplot(df4, aes(yearBuiltMissing, fill=Developed)) +
+  geom_bar(position = "fill")
 
 ggsave('./figures/yrblt_miss_vs_dev.png', height=4, width=4)
 
@@ -236,7 +251,7 @@ rsq.kl(step.mod)
 ### Taking log transforms of land value and improvement value helps.
 
 ```{r}
-mod.log <- glm(Developed ~ general_use_code + district + Upzone_Ratio + 
+mod.log <- glm(Developed ~ Upzone_Ratio + 
                  zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
                  zp_RH2 + zp_FormBasedMulti + zp_Redev +
                  pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
@@ -247,6 +262,23 @@ mod.log <- glm(Developed ~ general_use_code + district + Upzone_Ratio +
 
 rsq.kl(mod.log)
 
+summary(mod.log)
+```
+
+```{r}
+base.mod %>%
+  modelsummary(output = "table.tex")
+```
+
+```{r}
+
+mod.log.latex <- mod.log %>%
+  tbl_regression(exponentiate = TRUE, intercept=TRUE) %>%
+  as_gt() %>%
+  gt::as_latex()
+```
+
+```{r}
 summary(mod.log)
 ```
 
