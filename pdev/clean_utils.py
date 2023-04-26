@@ -26,6 +26,7 @@ def get_dbi_data():
 
 def clean_dates(df):
     """In-place conversion of dates"""
+    
     date_cols = [c for c in df.columns if 'date' in c.lower()]
     for date in date_cols:
         df[date] = pd.to_datetime(df[date], errors='coerce')
@@ -105,7 +106,7 @@ def merge_tax(df, tax, cycle=4, parcels=None):
 
 def transform_bluesky_to_geospatial(bluesky, cycle=4):
     """Return a geodataframe from bluesky. Adds columns for mapblklot, blklot,
-    geometry, CANTID_blklot_backup, CANTID_geometry_backup
+    geometry #, CANTID_blklot_backup, CANTID_geometry_backup
     """
     
     allParcels = get_parcels() 
@@ -117,9 +118,9 @@ def transform_bluesky_to_geospatial(bluesky, cycle=4):
     geoDf = allParcels.merge(bluesky, right_on='MapBlkLot_Master', left_on='mapblklot', how='right')
 
     # For each MapBlkLot_Master, get a list of unique blklot and geometry fields.
-    cantIDBackup = geoDf.groupby('MapBlkLot_Master')[['blklot', 'geometry']].agg(['unique'])
-    cantIDBackup = cantIDBackup.reset_index()
-    cantIDBackup = cantIDBackup.droplevel(1, axis=1)
+    # cantIDBackup = geoDf.groupby('MapBlkLot_Master')[['blklot', 'geometry']].agg(['unique'])
+    # cantIDBackup = cantIDBackup.reset_index()
+    # cantIDBackup = cantIDBackup.droplevel(1, axis=1)
 
     # When list of unique blklot and geometry is empty or has a single element, replace list with nan.
     def backup(orig):
@@ -128,17 +129,17 @@ def transform_bluesky_to_geospatial(bluesky, cycle=4):
         return orig
 
     # Clean cantIDBackUp
-    cantIDBackup.blklot = cantIDBackup.blklot.apply(backup)
-    cantIDBackup.geometry = cantIDBackup.geometry.apply(backup)
-    cantIDBackup = cantIDBackup.rename({'blklot': 'CANTID_blklot_backup',
-                                        'geometry': 'CANTID_geometry_backup'}, axis=1)
+    # cantIDBackup.blklot = cantIDBackup.blklot.apply(backup)
+    # cantIDBackup.geometry = cantIDBackup.geometry.apply(backup)
+    # cantIDBackup = cantIDBackup.rename({'blklot': 'CANTID_blklot_backup',
+    #                                    'geometry': 'CANTID_geometry_backup'}, axis=1)
     
     # For now, let's roll with most recent parcel added to map. If it fails to yield permit match, we can use
     # the parcels saved in cantIDBackup.
     geoDf = geoDf.sort_values('date_map_a', ascending=False).groupby('MapBlkLot_Master').nth(0)
     geoDf = geoDf.drop(allParcels.columns[2:-2], axis=1)
     geoDf = geoDf.reset_index()
-    geoDf = geoDf.merge(cantIDBackup, right_on='MapBlkLot_Master', left_on='MapBlkLot_Master', how='right')
+    #geoDf = geoDf.merge(cantIDBackup, right_on='MapBlkLot_Master', left_on='MapBlkLot_Master', how='right')
     return geoDf
 
 
@@ -172,12 +173,12 @@ def get_pipeline_permits(cycle=3, dbi=None):
 
     # Group by mapblocklot, agg number of each permit type
     pipeline_by_type = dbi.groupby(['blocklot']).permit_type.value_counts().unstack()
-    pipeline_by_type.columns = ['pipeline' + str(i) for i in pipeline_by_type.columns]
+    pipeline_by_type.columns = ['permit' + str(i) for i in pipeline_by_type.columns]
     pipeline_by_type.fillna(0, inplace=True)
     pipeline_by_cost = dbi.groupby('blocklot').estimated_cost.sum()
 
     # Group by mapblocklot, agg of permit cost
-    pipeline_by_cost.name = 'pipeline_costs'
+    pipeline_by_cost.name = 'permit_costs'
     pipeline = pd.concat((pipeline_by_cost, pipeline_by_type), axis=1)
     return pipeline
 
