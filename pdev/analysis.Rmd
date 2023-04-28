@@ -19,9 +19,27 @@ library(knitr)
 ```
 
 ```{r}
-df4 <- read.csv('./cleaned_rhna4_data.csv')
+df4 <- read_csv('./cleaned_rhna4_data.csv')
 
 df4 <- select(df4, -MapBlkLot_Master)
+
+df4 <- df4 %>%
+  mutate_if(function(x) { is.numeric(x) & n_distinct(x) == 2}, as.logical)
+```
+
+```{r}
+lmh <- c('low', 'medium', 'high')
+
+df4['Upzone_Ratio_Binned'] = cut_number(df4$Upzone_Ratio, 
+                                        3, 
+                                        labels=lmh)
+
+df4['assessed_land_value_binned'] = cut_number(df4$assessed_land_value, 3, 
+                                               labels=lmh)
+df4['assessed_improvement_value_binned'] = cut_number(df4$assessed_improvement_value, 
+                                                      3,
+                                                      labels=lmh)
+
 ```
 
 ```{r}
@@ -40,15 +58,14 @@ df4
 ### Remove illogical Values
 
 ```{r}
-df4$Developed <- df4$Developed > 0
-df4 <- df4[df4$ROOMS >= 0,]
-df4 <- df4[df4$FBA >= 0,]
-df4 <- df4[df4$YRBLT <= 2023,]
+df4 <- df4[df4$n_rooms >= 0,]
+df4 <- df4[df4$basement_area >= 0,]
+df4 <- df4[df4$year_property_built <= 2023,]
 
 # There are 19 properties supposedly built before SF's founding. I set to year 0 
-df4[0 < df4$YRBLT & df4$YRBLT <= 1776,]$YRBLT <- 0
+df4[0 < df4$year_property_built & df4$year_property_built <= 1776,]$year_property_built <- 0
 
-df4['yearBuiltMissing'] <- df4$YRBLT == 0
+df4['yearBuiltMissing'] <- df4$year_property_built == 0
 
 ```
 
@@ -56,15 +73,12 @@ df4['yearBuiltMissing'] <- df4$YRBLT == 0
 
 ```{r}
 # Area code that affects taxes
-df4$RP1TRACDE <- as.factor(df4$RP1TRACDE)
+df4$tax_rate_area_code <- as.factor(df4$tax_rate_area_code)
 
 # Property records are split up into volumes for organizational purposes.
 # This is likely highly correlated with neighborhoods or census tracts.
-df4$RP1VOLUME <- as.factor(df4$RP1VOLUME)
+df4$volume_number <- as.factor(df4$volume_number)
 
-df4$inInventory <- ifelse(df4$inInventory == 'True', 1, 0)
-df4$entirely_steep_lot <- ifelse(df4$entirely_steep_lot == 'True', 1, 0)
-df4$partly_steep_lot <- ifelse(df4$partly_steep_lot == 'True', 1, 0)
 
 ```
 
@@ -77,7 +91,7 @@ summary(base.mod)
 base.mod.latex <- base.mod %>%
   tbl_regression(exponentiate = TRUE, intercept=TRUE) %>%
   as_gt() %>%
-  gt::as_latex()
+  gtsave('basic.mod.tex', path='./')
  
 ```
 
@@ -129,103 +143,184 @@ This is 555 California Street, the fourth largest skyscraper in SF. So the large
 
 
 ```{r}
-df4[df4$RP1LNDVAL == max(df4$RP1LNDVAL),]
+df4[df4$assessed_land_value == max(df4$assessed_land_value),]
 ```
 
 ```{r message=FALSE}
 ggplot(df4) + 
-  geom_histogram(aes(log(1 + ROOMS)))
+  geom_histogram(aes(log(1 + n_rooms)))
 ```
 
 ```{r message=FALSE}
 ggplot(df4) + 
-  geom_histogram(aes(RP1EXMVL1))
+  geom_histogram(aes(homeowner_excemption_value))
 ```
 
 
 ```{r message=FALSE}
 ggplot(df4) + 
-  geom_histogram(aes(log(1 + FBA)))
+  geom_histogram(aes(log(1 + basement_area)))
 ```
 
 
 ```{r message=FALSE}
 ggplot(df4) +
-  geom_histogram(aes(x=log(RP1LNDVAL + 1))) +
+  geom_histogram(aes(x=log(assessed_land_value + 1))) +
   facet_grid(Developed ~ ., scales = "free_y")
 ```
 
 ```{r message=FALSE}
 ggplot(df4) +
-  geom_histogram(aes(x=log(RP1IMPVAL + 1))) +
+  geom_histogram(aes(x=log(assessed_improvement_value + 1))) +
   facet_grid(Developed ~ ., scales = "free_y")
 ```
 
 
 ```{r}
-table(df4$RP1STACDE)
+table(df4$tax_rate_area_code)
 ```
 
 
 ### EDA
 
-
-
-RP1LNDVAL 0.057
-zp DensRestMulti 0.045
-owner occ -0.042
-inInventory
-
 ```{r}
 ggplot(df4) +
-  geom_point(aes(x=SQFT, y=LAREA), alpha=.1)
+  geom_point(aes(x=log1p(property_area_in_square_feet), y=log1p(lot_area), color=Developed), alpha=1, size=.1)
 
 ```
 
 This is a bad plot that distorts proportions.
 ```{r}
 ggplot(df4) +
-  geom_boxplot(aes(x=Developed, y=Upzone_Ratio)) +
-  scale_y_log10()
+  geom_boxplot(aes(x=Developed, y=log1p(Upzone_Ratio))) +
+  theme_bw()
 
-ggsave('./figures/upzone_ratio_dev_boxplot.png', width=4, height=4)
-```
-```{r}
-ggplot(df4,aes(x = Residential_Dummy,fill = Developed)) + 
-    geom_bar(position = "fill")
-
-ggsave('./figures/residenital_vs_dev.png', height=4, width=4)
+ggsave('./figures/upzone_ratio_dev_boxplot.png', width=3, height=3)
 ```
 
 ```{r}
-ggplot(df4[df4$YRBLT > 0,]) +
-  geom_boxplot(aes(x=Developed, y=YRBLT))
-ggsave('./figures/yrblt_vs_dev.png', height=4, width=4)
+ggplot(df4, aes(x = Developed, fill = as.factor(Residential_Dummy))) +
+  geom_bar(position = "fill")+
+  scale_y_continuous(labels = scales::percent) + 
+  ylab('Proportion') +
+  labs(fill='Residential') +
+  theme_bw()
+
+ggsave('./figures/residenital_vs_dev.png', height=3, width=3)
+```
+
+```{r}
+ggplot(df4[df4$year_property_built > 0,]) +
+  geom_boxplot(aes(x=Developed, y=year_property_built)) +
+  theme_bw()
+
+ggsave('./figures/yrblt_vs_dev.png', height=3, width=3)
 
 ```
+
+```{r}
+ggplot(df4, aes(x=Developed, fill=yearBuiltMissing)) +
+  geom_bar(position = "fill") +
+  theme_bw() +
+  ylab('Proportion') +
+  scale_y_continuous(labels = scales::percent) 
+
+ggsave('./figures/yrblt_miss_vs_dev.png', height=3, width=3)
+
+```
+
+
 ```{r}
 ggplot(df4) +
-  geom_boxplot(aes(x=Developed, y=yearBuiltMissing))
+  geom_boxplot(aes(x=Developed, y=log1p(buildable_envelope_1000)))+
+  theme_bw()
+ggsave('./figures/env_dev.png', height=3, width=3)
+```
+
+```{r}
+ggplot(df4) +
+  geom_boxplot(aes(x=Developed, y=log1p(assessed_land_value)))+
+  theme_bw()
+ggsave('./figures/landval_dev.png', height=3, width=3)
+```
+
+# Two-way interaction between residential and historic
+
+```{r}
+
+se <- function(x){
+  return(sqrt(var(x)/length(x)))
+}
 
 
-ggplot(df4, aes(yearBuiltMissing, fill=Developed)) +
-  geom_bar(position = "fill")
+two_way_interaction_plot <- function(factor1, factor2, response, factor2_name, xlab, title) {
+  means=by(response, list(factor1, factor2), mean)
+  ses=by(response, list(factor1, factor2), se)
+  interaction.plot(x.factor=factor1, trace.factor=factor2, response=response, ylim=c(0,.025), col=c('blue','red'), xlab=xlab, trace.label = factor2_name, ylab='Development Rate')
+title(title, font=10)
+  for (i in 1:length(ses)){
+    index = i #
+    mean <- means[i]
+    se <- ses[i]
+    if (i <= 2) {
+      lines(c(i,i),c(mean-se,mean+se), col='blue', type='o', lty=5) 
+    } else {
+      lines(c(i%/%2,i%/%2),c(mean-se,mean+se), col='red', type='o', lty=5) 
+    }
+  }
+}
+```
 
-ggsave('./figures/yrblt_miss_vs_dev.png', height=4, width=4)
+```{r}
+
+with(df4, {
+  two_way_interaction_plot(Historic, Residential_Dummy, Developed,
+                           'residential_use', 'historic', 
+                           'Do historic status and residential use interact?')
+})
+```
+
+```{r}
+
+hr_dev <- df4 %>%
+  group_by(Historic, Residential_Dummy) %>%
+  summarize(dev_rate = mean(Developed), n = n()) %>%
+  ungroup() %>%
+  mutate(se = sqrt(as.numeric(dev_rate) * (1 - as.numeric(dev_rate)) / n))
+
+
+ggplot(hr_dev, aes(x = Historic, y=dev_rate, color=as.logical(Residential_Dummy))) + 
+  geom_line() +
+  labs(color='ResidentialDummy', y='development rate') +
+  geom_errorbar(aes(x = Historic, ymin=dev_rate - 1.96*se, ymax=dev_rate + 1.96*se, width=.2)) +
+  scale_y_continuous(labels = scales::percent) 
+
+ggsave('./figures/res_historic_dev.png', width=3, height=3)
+
 
 ```
 
 
 ```{r}
-ggplot(df4) +
-  geom_boxplot(aes(x=Developed, y=log1p(Envelope_1000)))
-ggsave('./figures/env_dev.png', height=4, width=4)
-```
 
-```{r}
-ggplot(df4) +
-  geom_boxplot(aes(x=Developed, y=log1p(RP1LNDVAL)))
-ggsave('./figures/landval_dev.png', height=4, width=4)
+steep_res_interact_df <- df4 %>%
+  mutate(existing_residential_use = as.logical(Residential_Dummy)) %>%
+  group_by(entirely_steep_lot, existing_residential_use) %>%
+  summarise(development_rate = mean(Developed), n = n()) %>%
+  mutate(se = sqrt(as.numeric(development_rate) * (1 - as.numeric(development_rate)) / n))
+
+
+ggplot(steep_res_interact_df) + 
+  aes(x = entirely_steep_lot, 
+      color = existing_residential_use,
+      group = existing_residential_use,
+      y = development_rate)  +
+  geom_line() +
+  geom_errorbar(aes(ymin=development_rate - 1.96 * se, ymax=development_rate + 1.96 * se, width=.2)) +
+  scale_y_continuous(labels = scales::percent ) 
+
+ggsave('./figures/res_historic_dev.png', width=3, height=3)
+
 ```
 
 ### Model fitting
@@ -234,14 +329,13 @@ ggsave('./figures/landval_dev.png', height=4, width=4)
 I used forward selection to select variables, but it's turned off for creating this R markdown file since it takes an hour to run.
 
 ```{r, eval=F}
-mod.init <- glm(Developed ~ 1, family='binomial', select(df4, -ZONE))
-mod.all <- glm(Developed ~ . -neighborhood, family='binomial', select(df4, -ZONE, -EXEMPTYPE, -RP1PPTVAL, -RP1FXTVAL, -RP1EXMVL2, -RP1CLACDE))
+mod.init <- glm(Developed ~ 1, family='binomial', select(df4, -zoning_code))
+mod.all <- glm(Developed ~ . -neighborhood, family='binomial', select(df4, -zoning_code, -exemption_type_code, -assessed_personal_prop_value, -RP1FXTVAL, -RP1EXMVL2, -RP1CLACDE))
 step.mod <- step(mod.init, direction='forward', scope=formula(mod.all))
 ```
 
 ```{r, eval=F}
 summary(step.mod)
-
 ```
 
 ```{r, eval=F}
@@ -255,14 +349,22 @@ mod.log <- glm(Developed ~ Upzone_Ratio +
                  zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
                  zp_RH2 + zp_FormBasedMulti + zp_Redev +
                  pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
-                 log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
+                 log1p(assessed_land_value) + log1p(assessed_improvement_value) + log1p(n_rooms) + log1p(n_beds) +
                  DEPTH  + Historic + inInventory + Residential_Dummy + 
-                 Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
+                 buildable_envelope_1000 + tax_rate_area_code + log1p(homeowner_excemption_value) + log1p(basement_area) + year_property_built, 
     family = "binomial", data = df4)
 
 rsq.kl(mod.log)
 
 summary(mod.log)
+
+rsq.kl(base.mod)
+AIC(base.mod)
+BIC(base.mod)
+rsq.kl(mod.log)
+AIC(mod.log)
+BIC(mod.log)
+
 ```
 
 ```{r}
@@ -283,7 +385,7 @@ summary(mod.log)
 ```
 
 ```{r}
-caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df4, -ZONE), type="response") > 0.5, TRUE, FALSE)),  
+caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df4, -zoning_code), type="response") > 0.5, TRUE, FALSE)),  
                        reference=as.factor(df4$Developed))
 
 ```
@@ -303,26 +405,6 @@ ggplot(df4, aes(x = mod.log$fitted.values)) +
 
 ```
 
-# Mixed effects
-
-Turned off temporarily since this is something to evaluate at a later stage
-```{r, eval=F}
-mod2 <- glmer(Developed ~ . + (1 | RP1CLACDE) - (ZONE + neighborhood + Residential_Dummy + district + RP1CLACDE + CONSTTYPE + EXEMPTYPE + general_use_code), 
-              family='binomial', 
-              df4)
-
-
-mod.log.er <- glmer(Developed ~ general_use_code + (1 | district) + Upzone_Ratio + 
-                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
-                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
-                 pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
-                 log1p(RP1LNDVAL) + log1p(RP1IMPVAL) + log1p(ROOMS) + log1p(BEDS) +
-                 DEPTH + Historic + inInventory + Residential_Dummy + 
-                 Envelope_1000 + RP1STACDE + log1p(RP1EXMVL1) + log1p(FBA) + YRBLT, 
-                 family = "binomial", data = select(df4, -ZONE))
-
-summary(mod.log.er)
-```
 
 
 
