@@ -1,0 +1,171 @@
+---
+title: "bluesky"
+output: html_document
+date: "2022-12-14"
+---
+
+## Setup
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+library(rsq)
+```
+
+```{r}
+df4 <- read_csv('./cleaned_rhna4_data.csv')
+
+df4 <- select(df4, -MapBlkLot_Master)
+
+df4 <- df4 %>%
+  mutate_if(function(x) { is.numeric(x) & n_distinct(x) == 2}, as.logical)
+```
+
+```{r}
+lmh <- c('_low', '_med', '_high')
+df4['Upzone_Ratio_Bin'] = cut_number(df4$Upzone_Ratio, 
+                                        3, 
+                                        labels=lmh)
+df4['land_value_bin'] = cut_number(df4$assessed_land_value, 3, 
+                                   labels=lmh)
+df4['improvement_value_bin'] = cut_number(df4$assessed_improvement_value, 
+                                          3,
+                                          labels=lmh)
+
+
+# Add levels to categorical variables to indicate missing level
+df4$neighborhood <- addNA(df4$neighborhood)
+df4$exemption_type_code <- addNA(df4$exemption_type_code)
+df4$status_code <- addNA(df4$status_code)
+df4$lot_code <- addNA(df4$lot_code)
+df4$zoning_code <- addNA(df4$zoning_code)
+df4$construction_type <- addNA(df4$construction_type)
+# Without above, I only have this many observations
+nrow(df4) - 153046
+```
+
+```{r}
+ncol(df4)
+
+1 - mean(df4$Developed)
+
+```
+
+```{r}
+df4
+```
+
+Remove illogical Values
+
+```{r}
+df4 <- df4[df4$n_rooms >= 0,]
+df4 <- df4[df4$basement_area >= 0,]
+df4 <- df4[df4$year_property_built <= 2023,]
+
+
+# There are 19 properties supposedly built before SF's founding. I set to year 0 
+df4[0 < df4$year_property_built & df4$year_property_built <= 1776,]$year_property_built <- 0
+
+df4['yearBuiltMissing'] <- df4$year_property_built == 0
+
+```
+
+Ensure categorical variables are treated as factors, not numeric types.
+
+```{r}
+# Area code that affects taxes
+df4$tax_rate_area_code <- as.factor(df4$tax_rate_area_code)
+
+# Property records are split up into volumes for organizational purposes.
+# This is likely highly correlated with neighborhoods or census tracts.
+df4$volume_number <- as.factor(df4$volume_number)
+
+df4$district <- as.factor(df4$district)
+df4$district <- addNA(df4$district)
+df4_lot <- df4[df4$lot_area > 0,]
+
+```
+
+### Baseline model finds a negative relationship between lot area and development
+
+```{r}
+mod.init <- glm(Developed ~ log(lot_area), family='binomial', df4_lot)
+summary(mod.init)
+
+```
+
+### The sign flips in a larger model
+
+```{r}
+mod.log <- glm(Developed ~ + log(lot_area) + 
+                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                 permit_new_construction + 
+                 permit_additions_alterations_or_repairs + permit_sign +
+                 permit_grade_or_quarry_or_fill_or_excavate + 
+                 permit_demolitions + permit_otc_alterations +
+                 log1p(n_rooms) + log1p(n_bedrooms) +
+                 lot_depth + Historic +  
+                 buildable_envelope_1000 + district + 
+                 log1p(homeowner_exemption_value) + log1p(basement_area) + 
+                 year_property_built + yearBuiltMissing +
+                 (Upzone_Ratio_Bin + Residential_Dummy +
+                    land_value_bin + improvement_value_bin)^2,  
+    family = "binomial", data = df4_lot, na.action = 'na.omit')
+
+summary(mod.log)
+
+```
+
+Slight downward trend in the residuals as a function of increasing lot area? May be indicative of a missing quadratic term in the model.
+
+```{r}
+plot(log(df4_lot$lot_area), resid(mod.log))
+```
+
+
+
+Same model as mod.log except lot area is binned instead of logged. The results are the same: large lots have higher odds of housing.
+
+```{r}
+df4_lot['lot_area_bin'] = cut_number(df4_lot$lot_area, 
+                                     3,
+                                     labels=lmh)
+mod.bin <- glm(Developed ~ + lot_area_bin + 
+                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                 permit_new_construction + 
+                 permit_additions_alterations_or_repairs + permit_sign +
+                 permit_grade_or_quarry_or_fill_or_excavate + 
+                 permit_demolitions + permit_otc_alterations +
+                 log1p(n_rooms) + log1p(n_bedrooms) +
+                 lot_depth + Historic +  
+                 buildable_envelope_1000 + district + 
+                 log1p(homeowner_exemption_value) + log1p(basement_area) + 
+                 year_property_built + yearBuiltMissing +
+                 (Upzone_Ratio_Bin + Residential_Dummy +
+                    land_value_bin + improvement_value_bin)^2,  
+    family = "binomial", data = df4_lot, na.action = 'na.omit')
+
+summary(mod.bin)
+
+```
+
+The residuals are marginally better.
+
+```{r}
+plot(log(df4_lot$lot_area), resid(mod.bin))
+```
+
+Measure r-squared deviance:
+
+```{r}
+rsq.kl(mod.init)
+```
+
+```{r}
+rsq.kl(mod.log)
+```
+
+```{r}
+rsq.kl(mod.bin)
+```
