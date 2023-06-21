@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[
+backend=biber,
+sorting=nty
+]{biblatex}
+\usepackage{graphicx} 
+\usepackage{amssymb, longtable, array}
+\usepackage{booktabs, caption, longtable}
+\usepackage[T1]{fontenc}
+\setlength{\tabcolsep}{0.5em}
+\setlength{\extrarowheight}{1pt}
+
+\usepackage[utf8]{inputenc}
+\usepackage{tikz-cd}
+\usepackage{biblatex}
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage[labelfont=bf]{caption}
+
+\setlength{\LTpost}{0mm}
+\begin{longtable}{lccc}
+\toprule
+\textbf{Characteristic} & \textbf{OR}\textsuperscript{\textit{1}} & \textbf{95\% CI}\textsuperscript{\textit{1}} & \textbf{p-value} \\ 
+\midrule
+(Intercept) & 0.00 & 0.00, 0.00 & <0.001 \\ 
+inInventory &  &  &  \\ 
+    FALSE & — & — &  \\ 
+    TRUE & 7.85 & 5.64, 10.7 & <0.001 \\ 
+\bottomrule
+\end{longtable}
+\begin{minipage}{\linewidth}
+\textsuperscript{\textit{1}}OR = Odds Ratio, CI = Confidence Interval\\
+\end{minipage}
+
