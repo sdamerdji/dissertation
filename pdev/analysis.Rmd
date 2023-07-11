@@ -16,6 +16,7 @@ library(caret)
 library(corrr)
 library(knitr) 
 library(hdi)
+require(gridExtra)
 ```
 
 ```{r}
@@ -204,39 +205,57 @@ ggplot(df4) +
 
 This is a bad plot that distorts proportions.
 ```{r}
-ggplot(df4) +
+plot.upzone <- ggplot(df4) +
   geom_boxplot(aes(x=Developed, y=log1p(Upzone_Ratio))) +
+  ylab('Upzone Ratio (log)')
   theme_bw()
 
-ggsave('./figures/upzone_ratio_dev_boxplot.png', width=3, height=3)
+plot.yr <- ggplot(df4[df4$year_property_built > 0,]) +
+  geom_boxplot(aes(x=Developed, y=year_property_built)) +
+  ylab('Year Property Built')
+  theme_bw()
+
+grid.arrange(plot.upzone, plot.yr, ncol=2)
+
+g <- arrangeGrob(plot.upzone, plot.yr, ncol=2)
+ggsave("./figures/eda_boxplots.png", g, height=2.5, width=7)
 ```
 
 ```{r}
-ggplot(df4, aes(x = Developed, fill = as.factor(Residential_Dummy))) +
+plot.residential <- ggplot(df4, aes(x = Developed, fill = as.factor(Residential_Dummy))) +
   geom_bar(position = "fill")+
   scale_y_continuous(labels = scales::percent) + 
   ylab('Proportion') +
-  labs(fill='Residential') +
-  theme_bw()
+  labs(fill='Residential Use') +
+  theme_bw() +
+  scale_fill_grey(start = .1, end = .9) +
+  theme(legend.position="bottom")
 
-ggsave('./figures/residenital_vs_dev.png', height=3, width=3)
+plot.no.year <- ggplot(df4, aes(x=Developed, fill=yearBuiltMissing)) +
+  geom_bar(position = "fill") +
+  theme_bw() +
+  ylab('Proportion') +
+  scale_y_continuous(labels = scales::percent) +
+  #scale_fill_grey() +
+  scale_fill_grey(start = .3, end = .8) +
+  theme(legend.position="bottom")
+
+grid.arrange(plot.residential, plot.no.year, ncol=2)
+
+g <- arrangeGrob(plot.residential, plot.no.year, ncol=2)#generates g
+ggsave('./figures/eda_barplots.png', g, height=2.5, width=7)
 ```
 
 ```{r}
-ggplot(df4[df4$year_property_built > 0,]) +
-  geom_boxplot(aes(x=Developed, y=year_property_built)) +
-  theme_bw()
+
+
 
 ggsave('./figures/yrblt_vs_dev.png', height=3, width=3)
 
 ```
 
 ```{r}
-ggplot(df4, aes(x=Developed, fill=yearBuiltMissing)) +
-  geom_bar(position = "fill") +
-  theme_bw() +
-  ylab('Proportion') +
-  scale_y_continuous(labels = scales::percent) 
+
 
 ggsave('./figures/yrblt_miss_vs_dev.png', height=3, width=3)
 
