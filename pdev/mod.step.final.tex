@@ -1,0 +1,77 @@
+\setlength{\LTpost}{0mm}
+\begin{longtable}{lccc}
+\toprule
+\textbf{Characteristic} & \textbf{OR}\textsuperscript{\textit{1}} & \textbf{95\% CI}\textsuperscript{\textit{1}} & \textbf{p-value} \\ 
+\midrule
+(Intercept) & 6.76 & 0.00, 1,471,756 & 0.8 \\ 
+inInventory &  &  &  \\ 
+    FALSE & — & — &  \\ 
+    TRUE & 0.76 & 0.52, 1.10 & 0.15 \\ 
+zp\_DensRestMulti & 12.5 & 7.35, 21.4 & <0.001 \\ 
+zp\_OfficeComm & 9.83 & 5.04, 18.9 & <0.001 \\ 
+zp\_PDRInd & 3.83 & 2.00, 7.31 & <0.001 \\ 
+zp\_RH3\_RM1 & 7.42 & 4.01, 13.6 & <0.001 \\ 
+zp\_RH2 & 5.20 & 2.84, 9.50 & <0.001 \\ 
+zp\_FormBasedMulti & 11.3 & 5.92, 20.6 & <0.001 \\ 
+zp\_Redev & 5.07 & 2.02, 11.8 & <0.001 \\ 
+permit\_additions\_alterations\_or\_repairs & 1.11 & 1.04, 1.16 & <0.001 \\ 
+permit\_sign & 0.35 & 0.11, 0.74 & 0.023 \\ 
+permit\_grade\_or\_quarry\_or\_fill\_or\_excavate & 0.51 & 0.15, 0.90 & 0.050 \\ 
+permit\_demolitions & 1.97 & 1.52, 2.50 & <0.001 \\ 
+permit\_otc\_alterations & 0.74 & 0.66, 0.83 & <0.001 \\ 
+buildable\_envelope\_1000 & 1.00 & 1.00, 1.00 & <0.001 \\ 
+yearBuiltMissing &  &  &  \\ 
+    FALSE & — & — &  \\ 
+    TRUE & 0.00 & 0.00, 10.6 & 0.13 \\ 
+year\_property\_built & 1.0 & 0.99, 1.00 & 0.088 \\ 
+district &  &  &  \\ 
+    1 & — & — &  \\ 
+    2 & 1.21 & 0.35, 4.06 & 0.8 \\ 
+    3 & 13.9 & 5.84, 38.7 & <0.001 \\ 
+    4 & 0.86 & 0.04, 5.14 & 0.9 \\ 
+    5 & 3.73 & 1.61, 10.2 & 0.004 \\ 
+    6 & 4.43 & 1.79, 12.6 & 0.002 \\ 
+    7 & 3.22 & 1.17, 9.60 & 0.026 \\ 
+    8 & 2.21 & 0.91, 6.20 & 0.10 \\ 
+    9 & 7.00 & 3.24, 18.3 & <0.001 \\ 
+    10 & 2.99 & 1.28, 8.17 & 0.018 \\ 
+    NaN & 52.6 & 12.5, 222 & <0.001 \\ 
+Upzone\_Ratio\_Bin &  &  &  \\ 
+    \_low & — & — &  \\ 
+    \_med & 0.57 & 0.17, 1.75 & 0.3 \\ 
+    \_high & 0.88 & 0.42, 2.09 & 0.7 \\ 
+Residential\_Dummy & 0.34 & 0.20, 0.57 & <0.001 \\ 
+Historic & 0.31 & 0.19, 0.49 & <0.001 \\ 
+land\_value\_bin &  &  &  \\ 
+    \_low & — & — &  \\ 
+    \_med & 0.10 & 0.00, 0.76 & 0.059 \\ 
+    \_high & 0.85 & 0.16, 3.58 & 0.8 \\ 
+improvement\_value\_bin &  &  &  \\ 
+    \_low & — & — &  \\ 
+    \_med & 2.91 & 0.36, 14.6 & 0.2 \\ 
+    \_high & 12.9 & 2.56, 53.3 & <0.001 \\ 
+Upzone\_Ratio\_Bin * land\_value\_bin &  &  &  \\ 
+    \_med * \_med & 23.2 & 2.04, 617 & 0.022 \\ 
+    \_high * \_med & 14.3 & 1.99, 306 & 0.025 \\ 
+    \_med * \_high & 3.30 & 0.37, 32.7 & 0.3 \\ 
+    \_high * \_high & 6.66 & 1.59, 34.2 & 0.014 \\ 
+Upzone\_Ratio\_Bin * improvement\_value\_bin &  &  &  \\ 
+    \_med * \_med & 0.00 & 0.00, 0.00 & >0.9 \\ 
+    \_high * \_med & 0.45 & 0.07, 3.83 & 0.4 \\ 
+    \_med * \_high & 0.44 & 0.05, 3.38 & 0.4 \\ 
+    \_high * \_high & 0.44 & 0.08, 1.89 & 0.3 \\ 
+Residential\_Dummy * Historic & 2.23 & 1.12, 4.45 & 0.022 \\ 
+Residential\_Dummy * improvement\_value\_bin &  &  &  \\ 
+    Residential\_Dummy * \_med & 0.22 & 0.09, 0.57 & 0.002 \\ 
+    Residential\_Dummy * \_high & 0.30 & 0.16, 0.55 & <0.001 \\ 
+land\_value\_bin * improvement\_value\_bin &  &  &  \\ 
+    \_med * \_med & 1.36 & 0.33, 8.19 & 0.7 \\ 
+    \_high * \_med & 0.48 & 0.11, 2.82 & 0.4 \\ 
+    \_med * \_high & 0.20 & 0.05, 1.06 & 0.040 \\ 
+    \_high * \_high & 0.21 & 0.06, 0.97 & 0.024 \\ 
+\bottomrule
+\end{longtable}
+\begin{minipage}{\linewidth}
+\textsuperscript{\textit{1}}OR = Odds Ratio, CI = Confidence Interval\\
+\end{minipage}
+

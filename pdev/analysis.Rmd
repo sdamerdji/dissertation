@@ -17,6 +17,7 @@ library(corrr)
 library(knitr) 
 library(hdi)
 require(gridExtra)
+library(MASS)
 ```
 
 ```{r}
@@ -29,17 +30,16 @@ df4 <- df4 %>%
 ```
 
 ```{r}
-lmh <- c('low', 'medium', 'high')
 
-df4['Upzone_Ratio_Binned'] = cut_number(df4$Upzone_Ratio, 
+lmh <- c('_low', '_med', '_high')
+df4['Upzone_Ratio_Bin'] = cut_number(df4$Upzone_Ratio, 
                                         3, 
                                         labels=lmh)
-
-df4['assessed_land_value_binned'] = cut_number(df4$assessed_land_value, 3, 
-                                               labels=lmh)
-df4['assessed_improvement_value_binned'] = cut_number(df4$assessed_improvement_value, 
-                                                      3,
-                                                      labels=lmh)
+df4['land_value_bin'] = cut_number(df4$assessed_land_value, 3, 
+                                   labels=lmh)
+df4['improvement_value_bin'] = cut_number(df4$assessed_improvement_value, 
+                                          3,
+                                          labels=lmh)
 
 
 
@@ -367,91 +367,111 @@ hist(df4$property_area_in_square_feet)
 
 ```{r, eval=F}
 mod.init <- glm(Developed ~ inInventory, family='binomial', df4)
-
-
-to_log = c(#'assessed_land_value', 'assessed_improvement_value',
-           'misc_exemption_value', 'assessed_personal_prop_value', 
-           'assessed_fixtures_value', 'n_rooms', 'n_stories', 'n_units', 'n_bedrooms', 
-           'homeowner_exemption_value', 'basement_area', 'lot_depth', 'lot_area',
-           'lot_frontage', 'buildable_envelope_1000', 'existing_envelope_1000',
-           'property_area_in_square_feet')
-
-formula_str <- paste("log1p(", paste(to_log, collapse = ") + log1p("), ")", sep = "")
-
-omit <- c('zoning_code', 'tax_rate_area_code',
-          'volume_number',  'census_tract', 
-          'district','property_class_code')
-
-non_log <- setdiff(colnames(df4), c(to_log, c('Developed')))
-non_log <- setdiff(non_log, omit)
-
-formula_str <- paste0('Developed ~ ', formula_str, ' + ', paste("", paste(non_log, collapse = " + "), "", sep = ""))
-interact <- c('Upzone_Ratio_Binned', 'Residential_Dummy', 
-              'assessed_land_value_binned', 'assessed_improvement_value_binned')
-interact_str <- paste("(", paste(interact, collapse = " + "), ")^2", sep = "")
-formula_str <- paste0(formula_str, ' + ', interact_str)
-
-mod.all <- glm(formula_str, family = 'binomial', df4, na.action='na.omit')
-
+summary(mod.init)
 ```
 
-```{r}
-# Remove nans
-df4_no_nan <- na.omit(df4)
-dmy <- dummyVars(' ~ .', data=df4_no_nan, fullRank=T)
-df4_dummy <- data.frame(predict(dmy, newdata = df4_no_nan))
-X <- select(df4_dummy, -DevelopedTRUE)
-X <- sapply(X, as.numeric)
-y <- df4_dummy$DevelopedTRUE
-fit.multi <- multi.split(X, y, 
-                         model.selector = lasso.firstq,
-                         args.model.selector = list(q = 10),
-                         parallel=TRUE)
-fit.multi
-head(fit.multi$pval.corr, 10) ## the first 10 p-values
-ci. <- confint(fit.multi)
-head(ci.) # the first 6
-stopifnot(all.equal(ci.,
-with(fit.multi, cbind(lci, uci)), check.attributes=FALSE))
-```
-# current_sales_date_yymmdd is all fucked up
-# I should pick either district or neighborhood
-# fd
+
 ```{r}
 options(max.print = 2000)
-summary(mod.all)
-```
-
-```{r, eval=F}
-summary(step.mod)
-```
-
-```{r, eval=F}
-rsq.kl(step.mod)
 ```
 
 ### Taking log transforms of land value and improvement value helps.
 
+
 ```{r}
-mod.log <- glm(Developed ~ Upzone_Ratio + 
+mod.log <- glm(Developed ~ buildable_envelope_1000 + 
                  zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
                  zp_RH2 + zp_FormBasedMulti + zp_Redev +
-                 pipeline2 + pipeline3 + pipeline4 + pipeline5 + pipeline6 + pipeline8 +
-                 log1p(assessed_land_value) + log1p(assessed_improvement_value) + log1p(n_rooms) + log1p(n_beds) +
-                 DEPTH  + Historic + inInventory + Residential_Dummy + 
-                 buildable_envelope_1000 + tax_rate_area_code + log1p(homeowner_excemption_value) + log1p(basement_area) + year_property_built, 
+                 permit_new_construction + 
+                 permit_additions_alterations_or_repairs + permit_sign +
+                 permit_grade_or_quarry_or_fill_or_excavate + 
+                 permit_demolitions + permit_otc_alterations +
+                 log1p(assessed_land_value) + log1p(assessed_improvement_value) + 
+                 log1p(n_rooms) + log1p(n_bedrooms) +
+                 Historic + inInventory + Residential_Dummy + 
+                 buildable_envelope_1000 + tax_rate_area_code + log1p(homeowner_exemption_value) + log1p(basement_area) +
+                 year_property_built, 
     family = "binomial", data = df4)
 
 rsq.kl(mod.log)
-
-summary(mod.log)
-
-rsq.kl(base.mod)
-AIC(base.mod)
-BIC(base.mod)
-rsq.kl(mod.log)
 AIC(mod.log)
 BIC(mod.log)
+
+summary(mod.log)
+```
+
+```{r}
+head(df4)
+
+
+mod.ex.ante <- glm(Developed ~ inInventory + 
+                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                 permit_new_construction + 
+                 permit_additions_alterations_or_repairs + permit_sign +
+                 permit_grade_or_quarry_or_fill_or_excavate + 
+                 permit_demolitions + permit_otc_alterations +
+                 log1p(lot_area) + log1p(n_rooms) + log1p(n_bedrooms) +
+                 buildable_envelope_1000 + district + 
+                 yearBuiltMissing + year_property_built + 
+                 Upzone_Ratio_Bin + Residential_Dummy + Historic + 
+                    land_value_bin + improvement_value_bin,
+                 family = "binomial", data = df4, na.action='na.omit')
+
+rsq.kl(mod.ex.ante)
+AIC(mod.ex.ante)
+BIC(mod.ex.ante)
+
+summary(mod.ex.ante)
+```
+
+```{r}
+mod.ex.ante <- glm(Developed ~ inInventory + 
+                   zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                   zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                   permit_new_construction + 
+                   permit_additions_alterations_or_repairs + permit_sign +
+                   permit_grade_or_quarry_or_fill_or_excavate + 
+                   permit_demolitions + permit_otc_alterations +
+                   buildable_envelope_1000 + 
+                   yearBuiltMissing + year_property_built + district +
+                   (Upzone_Ratio_Bin + Residential_Dummy + Historic + 
+                   land_value_bin + improvement_value_bin)^2,
+                   family = "binomial", data = df4, na.action='na.omit')
+
+rsq.kl(mod.ex.ante)
+AIC(mod.ex.ante)
+BIC(mod.ex.ante)
+
+summary(mod.ex.ante)
+```
+
+
+```{r}
+mod.step <- stepAIC(mod.ex.ante, 
+                    direction='backward', 
+                    scope=list(lower=mod.init$formula, 
+                               upper=mod.ex.ante$formula))
+
+```
+
+```{r}
+mod.step.final <- glm(Developed ~ inInventory + zp_DensRestMulti + zp_OfficeComm + 
+                      zp_PDRInd + zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + zp_Redev + 
+                      permit_additions_alterations_or_repairs + permit_sign + permit_grade_or_quarry_or_fill_or_excavate + 
+                      permit_demolitions + permit_otc_alterations + buildable_envelope_1000 + 
+                      yearBuiltMissing + year_property_built + district + Upzone_Ratio_Bin + 
+                      Residential_Dummy + Historic + land_value_bin + improvement_value_bin + 
+                      Upzone_Ratio_Bin:land_value_bin + Upzone_Ratio_Bin:improvement_value_bin + 
+                      Residential_Dummy:Historic + Residential_Dummy:improvement_value_bin + 
+                      land_value_bin:improvement_value_bin,
+                      data=df4, 
+                      na.action='na.omit',
+                      family='binomial')
+
+rsq.kl(mod.step.final)
+AIC(mod.step.final)
+BIC(mod.step.final)
 
 ```
 
@@ -462,37 +482,13 @@ base.mod %>%
 
 ```{r}
 
-mod.log.latex <- mod.log %>%
+mod.step.final <- mod.step.final %>%
   tbl_regression(exponentiate = TRUE, intercept=TRUE) %>%
   as_gt() %>%
   gt::as_latex()
 ```
 
 ```{r}
-summary(mod.log)
+summary(mod.step.final)
 ```
-
-```{r}
-caret::confusionMatrix(data=as.factor(ifelse(predict(mod.log, select(df4, -zoning_code), type="response") > 0.5, TRUE, FALSE)),  
-                       reference=as.factor(df4$Developed))
-
-```
-
-```{r}
-caret::confusionMatrix(data=as.factor(as.logical(df4$inInventory)),  
-                       reference=as.factor(df4$Developed))
-
-```
-
-
-```{r message=FALSE}
-hist(mod.log$fitted.values)
-ggplot(df4, aes(x = mod.log$fitted.values)) +
-  geom_histogram() +
-  scale_y_log10()
-
-```
-
-
-
 
