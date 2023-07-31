@@ -1,0 +1,181 @@
+---
+title: "rdd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(MASS)
+library(lme4)
+
+```
+
+
+```{r}
+df <- read.csv("../data/clean_fees_rdd.csv")
+
+df <- dplyr::select(df, -MapBlkLot_Master, -X, -geometry)
+
+df <- df %>%
+  mutate_if(function(x) { is.numeric(x) & n_distinct(x) == 2}, as.logical)
+lmh <- c('_low', '_med', '_high')
+df['Upzone_Ratio_Bin'] = cut_number(df$Upzone_Ratio, 
+                                    3, 
+                                    labels=lmh)
+df['land_value_bin'] = cut_number(df$assessed_land_value, 3, 
+                                  labels=lmh)
+df['improvement_value_bin'] = cut_number(df$assessed_improvement_value, 
+                                         3,
+                                         labels=lmh)
+
+df$x <- df$x / 100
+df$y <- df$y / 100
+
+
+df$assessor_neighborhood <- addNA(df$assessor_neighborhood)
+df$exemption_code_definition <- addNA(df$exemption_code_definition)
+df$status_code <- addNA(df$status_code)
+df$lot_code <- addNA(df$lot_code)
+df$zoning_code <- addNA(df$zoning_code)
+df$construction_type <- addNA(df$construction_type)
+
+df <- df[df$number_of_bedrooms >= 0 && !is.na(df$number_of_bedrooms),]
+df <- df[df$basement_area >= 0 && !is.na(df$basement_area),]
+df <- df[df$year_property_built <= 2023 && !is.na(df$year_property_built),]
+df[is.na(df$year_property_built), 'year_property_built'] <- 0
+df$Net_Units_Completed[is.na(df$Net_Units_Completed) | (df$Net_Units_Completed < 0)] <- 0
+
+df['yearBuiltMissing'] <- (df$year_property_built == 0 | is.na(df$year_property_built))
+# Area code that affects taxes
+df$tax_rate_area_code <- as.factor(df$tax_rate_area_code)
+
+# Property records are split up into volumes for organizational purposes.
+# This is likely highly correlated with neighborhoods or census tracts.
+df$volume_number <- as.factor(df$volume_number)
+df$supervisor_district <- as.factor(df$supervisor_district)
+
+df$Developed <- as.logical(df$Developed)
+```
+
+# Binomial
+
+```{r}
+
+bern.mod <- glm(Developed ~ zp_DensRestMulti +  zp_OfficeComm + zp_PDRInd +
+                  zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + 
+                  zp_Redev + log1p(otc.alterations.permits) + Envelope_1000 +
+                  log1p(year_property_built) + Upzone_Ratio_Bin +
+                  Residential_Dummy  + Historic + land_value_bin + improvement_value_bin +
+                  Residential_Dummy:Historic + (dist_to_boundary * x * y * tier) +
+                  Residential_Dummy:improvement_value_bin, data=df, na.action='na.omit', family='binomial')
+
+summary(bern.mod)
+```
+```{r}
+bern.base.init <-  glm(Developed ~ tier, data=df, na.action='na.omit', family='binomial')
+summary(bern.base.init)
+
+```
+
+
+```{r}
+bern.step.mod <- stepAIC(bern.mod, direction="backward", scope=list(upper=bern.mod$formula, lower=bern.base.init$formula), trace=FALSE)
+summary(bern.step.mod)
+```
+# Poisson
+```{r}
+pois.base.init <-  glm(Developed ~ tier, data=df, na.action='na.omit', family='poisson')
+summary(pois.base.init)
+
+```
+
+
+```{r}
+#df100 <- df[df$dist_to_boundary < 100,]
+
+pois.mod <- glm(Net_Units_Completed ~ 
+                  zp_DensRestMulti +  zp_OfficeComm + zp_PDRInd +
+                  zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + log1p(Envelope_1000) +
+                  zp_Redev + use_definition + lot_code + percent_of_ownership + log1p(misc_exemption_value) + 
+                  log1p(otc.alterations.permits) + Envelope_1000 + log1p(number_of_units) + log1p(number_of_bedrooms) + exemption_code_definition +
+                  log1p(year_property_built) + Upzone_Ratio_Bin + lot_depth + log1p(assessed_personal_property_value) + log1p(lot_area) +
+                  Residential_Dummy  + Historic + land_value_bin + improvement_value_bin +
+                  Residential_Dummy:Historic + (dist_to_boundary + x + y + tier)^2 + assessor_neighborhood +
+                  Residential_Dummy:improvement_value_bin, data=df, na.action='na.omit', family='poisson', x=TRUE)
+
+summary(pois.mod, dispersion=5.56)
+```
+```{r}
+# Phi hat is 4.52
+scaled.dev.resids <- residuals(pois.mod, type='deviance') / (1 - influence(pois.mod)$hat)
+var(scaled.dev.resids[is.finite(scaled.dev.resids)])
+```
+
+```{r}
+pois.step.mod <- stepAIC(pois.mod, direction="backward", scope=list(upper=pois.mod$formula, lower=pois.base.init$formula), k=log(nrow(df)), trace=FALSE)
+
+summary(pois.step.mod, dispersion = 6.16)
+```
+
+
+```{r}
+pois.mm <- glmer(Net_Units_Completed ~ zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + 
+        zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + 
+        log1p(Envelope_1000) + 
+        use_definition + lot_code +  
+        log1p(otc.alterations.permits) + log1p(number_of_units) + 
+        Upzone_Ratio_Bin +  
+        Residential_Dummy + Historic + land_value_bin + improvement_value_bin + 
+        dist_to_boundary + x + y + tier +  
+        Residential_Dummy:Historic + dist_to_boundary:tier + 
+        Residential_Dummy:improvement_value_bin + (1 | assessor_neighborhood),
+      data = df100, 
+      family = 'poisson')
+
+summary(pois.mm)
+```
+
+```{r}
+# Phi hat is 4.47
+scaled.dev.resids <- residuals(pois.step.mod, type='deviance') / (1 - influence(pois.step.mod)$hat)
+var(scaled.dev.resids[is.finite(scaled.dev.resids)])
+```
+
+```{r}
+calc_marginal_effects <- function(model, newdata, treatment_var = "tier") {
+  # Duplicate the data
+  newdata1 <- newdata2 <- newdata
+  
+  # Set treatment variable to 1 in the first dataset and to 0 in the second
+  newdata1[[treatment_var]] <- "tier1"
+  newdata2[[treatment_var]] <- "tier2"
+  
+  # Predict the counts for both scenarios
+  pred1 <- predict(model, newdata=newdata1, type="response")
+  pred2 <- predict(model, newdata=newdata2, type="response")
+  
+  # Sum the marginal effects across all units
+  sum_marginal_effects <- sum(pred1 - pred2)
+  
+  return(sum_marginal_effects)
+}
+
+calc_marginal_effects(pois.step.mod, df)
+
+```
+
+```{r}
+pairwise_correlations <- pois.step.mod$x %>%
+  scale() %>%
+  correlate() %>%
+  stretch() 
+
+pairwise_correlations[!is.na(pairwise_correlations['r']),] %>%
+  filter(abs(r) > .5) %>%
+  arrange(r) %>%
+  filter(x > y)
+```
+
+```{r}
+plot(scale(df$x)*(df['tier'] == 'tier2'), df$y, s=.01)
+```
