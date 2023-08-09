@@ -1,0 +1,84 @@
+---
+title: "iv_analysis"
+output: html_document
+---
+
+```{r}
+require(plm)
+require(tidyverse)
+```
+
+```{r}
+df <- read.csv('./panel_fires.csv')
+df['Developed'] = df['Developed'] == 'True'
+```
+
+
+```{r}
+df <- df %>%
+  mutate(years_since_fire = ifelse(years_since_fire < 0, NaN, years_since_fire)) %>%
+  mutate(fire_damage = ifelse(is.nan(years_since_fire), 0, fire_damage))
+
+df['costs'] = (df['estimated_cost'] + df['imputed_land_value']
+               + max(df['assessed_improvement_value'] - df['fire_damage'], 0))
+
+df <- df[!duplicated(df[, c("MapBlkLot_Master", "year")]), ]
+
+df['val'] = df['revenue']/df['costs']
+
+```
+
+
+```{r}
+pd <- pdata.frame(df, index=c("MapBlkLot_Master", "year"))
+pdim(pd)
+
+# Remove observations not measured twice
+single_step = table(index(pd)$MapBlkLot_Master)[table(index(pd)$MapBlkLot_Master) == 1]
+pd2 <- pd[!index(pd)$MapBlkLot_Master %in% names(single_step),]
+```
+### Linear Probability Model (pooled)
+
+```{r}
+formula <- Developed ~ log1p(val) | log1p(fire_damage)
+
+# Estimate using 2SLS for panel data
+iv_model.lpm.pool <- plm::plm(formula, data = pd,
+                     model="pooling")
+```
+
+
+```{r}
+# Summary of the model
+summary(iv_model.lpm.pool)
+
+```
+
+## LPM (random effect)
+
+```{r}
+formula <- Developed ~ log1p(val) | log1p(fire_damage)
+
+# Estimate using 2SLS for panel data
+iv_model.random <- plm::plm(formula, data = pd2, model="random")
+```
+
+```{r}
+# Summary of the model
+summary(iv_model.random)
+
+
+```
+
+
+# Linear Model
+
+```{r}
+formula <- Net_Units_Completed ~ log1p(val) | log1p(fire_damage)
+
+# Estimate using 2SLS for panel data
+iv_model.pool <- plm::plm(formula, data = pd,
+                     model="pooling")
+summary(iv_model.pool)
+
+```
