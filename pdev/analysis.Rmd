@@ -21,12 +21,16 @@ library(MASS)
 ```
 
 ```{r}
-df4 <- read_csv('./cleaned_rhna4_data.csv')
+df4 <- read_csv('./cleaned_2011_data.csv')
 
-df4 <- select(df4, -MapBlkLot_Master)
+df4 <- dplyr::select(df4, -MapBlkLot_Master, -BlockLot, -parcel_number)
 
 df4 <- df4 %>%
   mutate_if(function(x) { is.numeric(x) & n_distinct(x) == 2}, as.logical)
+
+df4 <- df4[!is.na(df4$geometry),]
+
+df4 <- dplyr::select(df4, -geometry)
 ```
 
 ```{r}
@@ -41,16 +45,16 @@ df4['improvement_value_bin'] = cut_number(df4$assessed_improvement_value,
                                           3,
                                           labels=lmh)
 
+df4['year_property_built_na'] = is.na(df4$year_property_built) | (df4$year_property_built == 0)
 
-
-df4$neighborhood <- addNA(df4$neighborhood)
-df4$exemption_type_code <- addNA(df4$exemption_type_code)
+df4$assessor_neighborhood <- addNA(df4$assessor_neighborhood)
+df4$exemption_code_definition <- addNA(df4$exemption_code_definition)
 df4$status_code <- addNA(df4$status_code)
 df4$lot_code <- addNA(df4$lot_code)
 df4$zoning_code <- addNA(df4$zoning_code)
 df4$construction_type <- addNA(df4$construction_type)
-# Without above, I only have this many observations
-nrow(df4) - 153046
+
+
 ```
 
 ```{r}
@@ -62,21 +66,16 @@ ncol(df4)
 
 ```
 
-```{r}
-df4
-```
-
 ### Remove illogical Values
 
 ```{r}
-df4 <- df4[df4$n_rooms >= 0,]
+df4 <- df4[(df4$number_of_bedrooms >= 0) | is.na(df4$number_of_bedrooms),]
 df4 <- df4[df4$basement_area >= 0,]
-df4 <- df4[df4$year_property_built <= 2023,]
+df4 <- df4[df4$year_property_built <= 2023 | is.na(df4$year_property_built),]
 
 # There are 19 properties supposedly built before SF's founding. I set to year 0 
+df4[is.na(df4$year_property_built), 'year_property_built'] <- 0
 df4[0 < df4$year_property_built & df4$year_property_built <= 1776,]$year_property_built <- 0
-
-df4['yearBuiltMissing'] <- df4$year_property_built == 0
 
 ```
 
@@ -90,8 +89,8 @@ df4$tax_rate_area_code <- as.factor(df4$tax_rate_area_code)
 # This is likely highly correlated with neighborhoods or census tracts.
 df4$volume_number <- as.factor(df4$volume_number)
 
-df4$district <- as.factor(df4$district)
-df4$district <- addNA(df4$district)
+df4$supervisor_district <- as.factor(df4$supervisor_district)
+df4$supervisor_district <- addNA(df4$supervisor_district)
 ```
 
 ### Baseline model
@@ -132,7 +131,6 @@ corr_with_outcome
 
 
 ```{r, results='asis'}
-
 
 
 corr_with_treat <- df4 %>%
@@ -231,7 +229,7 @@ plot.residential <- ggplot(df4, aes(x = Developed, fill = as.factor(Residential_
   scale_fill_grey(start = .1, end = .9) +
   theme(legend.position="bottom")
 
-plot.no.year <- ggplot(df4, aes(x=Developed, fill=yearBuiltMissing)) +
+plot.no.year <- ggplot(df4, aes(x=Developed, fill=year_property_built_na)) +
   geom_bar(position = "fill") +
   theme_bw() +
   ylab('Proportion') +
@@ -244,21 +242,6 @@ grid.arrange(plot.residential, plot.no.year, ncol=2)
 
 g <- arrangeGrob(plot.residential, plot.no.year, ncol=2)#generates g
 ggsave('./figures/eda_barplots.png', g, height=2.5, width=7)
-```
-
-```{r}
-
-
-
-ggsave('./figures/yrblt_vs_dev.png', height=3, width=3)
-
-```
-
-```{r}
-
-
-ggsave('./figures/yrblt_miss_vs_dev.png', height=3, width=3)
-
 ```
 
 
@@ -361,10 +344,6 @@ I used forward selection to select variables, but it's turned off for creating t
 
 I gotta think more about nans. Cast nans to own category in factors. And omit 13 rows with no census data or x_coord or y_coord. 
 
-```{r}
-hist(df4$property_area_in_square_feet)
-```
-
 ```{r, eval=F}
 mod.init <- glm(Developed ~ inInventory, family='binomial', df4)
 summary(mod.init)
@@ -378,52 +357,6 @@ options(max.print = 2000)
 ### Taking log transforms of land value and improvement value helps.
 
 
-```{r}
-mod.log <- glm(Developed ~ buildable_envelope_1000 + 
-                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
-                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
-                 permit_new_construction + 
-                 permit_additions_alterations_or_repairs + permit_sign +
-                 permit_grade_or_quarry_or_fill_or_excavate + 
-                 permit_demolitions + permit_otc_alterations +
-                 log1p(assessed_land_value) + log1p(assessed_improvement_value) + 
-                 log1p(n_rooms) + log1p(n_bedrooms) +
-                 Historic + inInventory + Residential_Dummy + 
-                 buildable_envelope_1000 + tax_rate_area_code + log1p(homeowner_exemption_value) + log1p(basement_area) +
-                 year_property_built, 
-    family = "binomial", data = df4)
-
-rsq.kl(mod.log)
-AIC(mod.log)
-BIC(mod.log)
-
-summary(mod.log)
-```
-
-```{r}
-head(df4)
-
-
-mod.ex.ante <- glm(Developed ~ inInventory + 
-                 zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
-                 zp_RH2 + zp_FormBasedMulti + zp_Redev +
-                 permit_new_construction + 
-                 permit_additions_alterations_or_repairs + permit_sign +
-                 permit_grade_or_quarry_or_fill_or_excavate + 
-                 permit_demolitions + permit_otc_alterations +
-                 log1p(lot_area) + log1p(n_rooms) + log1p(n_bedrooms) +
-                 buildable_envelope_1000 + district + 
-                 yearBuiltMissing + year_property_built + 
-                 Upzone_Ratio_Bin + Residential_Dummy + Historic + 
-                    land_value_bin + improvement_value_bin,
-                 family = "binomial", data = df4, na.action='na.omit')
-
-rsq.kl(mod.ex.ante)
-AIC(mod.ex.ante)
-BIC(mod.ex.ante)
-
-summary(mod.ex.ante)
-```
 
 ```{r}
 mod.ex.ante <- glm(Developed ~ inInventory + 
@@ -434,7 +367,7 @@ mod.ex.ante <- glm(Developed ~ inInventory +
                    permit_grade_or_quarry_or_fill_or_excavate + 
                    permit_demolitions + permit_otc_alterations +
                    buildable_envelope_1000 + 
-                   yearBuiltMissing + year_property_built + district +
+                   year_property_built_na  + year_property_built + supervisor_district  +
                    (Upzone_Ratio_Bin + Residential_Dummy + Historic + 
                    land_value_bin + improvement_value_bin)^2,
                    family = "binomial", data = df4, na.action='na.omit')
@@ -457,14 +390,13 @@ mod.step <- stepAIC(mod.ex.ante,
 
 ```{r}
 mod.step.final <- glm(Developed ~ inInventory + zp_DensRestMulti + zp_OfficeComm + 
-                      zp_PDRInd + zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + zp_Redev + 
-                      permit_additions_alterations_or_repairs + permit_sign + permit_grade_or_quarry_or_fill_or_excavate + 
-                      permit_demolitions + permit_otc_alterations + buildable_envelope_1000 + 
-                      yearBuiltMissing + year_property_built + district + Upzone_Ratio_Bin + 
-                      Residential_Dummy + Historic + land_value_bin + improvement_value_bin + 
-                      Upzone_Ratio_Bin:land_value_bin + Upzone_Ratio_Bin:improvement_value_bin + 
-                      Residential_Dummy:Historic + Residential_Dummy:improvement_value_bin + 
-                      land_value_bin:improvement_value_bin,
+                        zp_PDRInd + zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + permit_new_construction + 
+                        permit_additions_alterations_or_repairs + permit_sign + permit_demolitions + 
+                        year_property_built_na + year_property_built + supervisor_district + 
+                        Upzone_Ratio_Bin + Residential_Dummy + Historic + land_value_bin + 
+                        improvement_value_bin + Upzone_Ratio_Bin:Residential_Dummy + 
+                        Upzone_Ratio_Bin:Historic + Residential_Dummy:Historic + 
+                        Residential_Dummy:land_value_bin,
                       data=df4, 
                       na.action='na.omit',
                       family='binomial')
@@ -475,20 +407,57 @@ BIC(mod.step.final)
 
 ```
 
-```{r}
-base.mod %>%
-  modelsummary(output = "table.tex")
-```
 
-```{r}
-
-mod.step.final <- mod.step.final %>%
-  tbl_regression(exponentiate = TRUE, intercept=TRUE) %>%
-  as_gt() %>%
-  gt::as_latex()
-```
 
 ```{r}
 summary(mod.step.final)
 ```
 
+### Appendix
+
+Robustness check involving 2011-2016 approvals
+
+```{r}
+robustness <- df4
+
+robustness[is.na(robustness['Permit Issued Date'])
+           | (robustness['Permit Issued Date'] > '2014-12-31'), 'Developed'] <- 0
+```
+
+```{r}
+mod.init.robust <- glm(Developed ~ inInventory, family='binomial', robustness)
+summary(mod.init.robust)
+```
+
+```{r}
+mod.ex.ante.robust <- glm(Developed ~ inInventory + 
+                   zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + zp_RH3_RM1 + 
+                   zp_RH2 + zp_FormBasedMulti + zp_Redev +
+                   permit_new_construction + 
+                   permit_additions_alterations_or_repairs + permit_sign +
+                   permit_grade_or_quarry_or_fill_or_excavate + 
+                   permit_demolitions + permit_otc_alterations +
+                   buildable_envelope_1000 + 
+                   year_property_built_na  + year_property_built + supervisor_district  +
+                   (Upzone_Ratio_Bin + Residential_Dummy + Historic + 
+                   land_value_bin + improvement_value_bin)^2,
+                   family = "binomial", data = robustness, na.action='na.omit')
+summary(mod.ex.ante.robust)
+```
+
+
+```{r}
+mod.step.final.robust <- glm(Developed ~ inInventory + zp_DensRestMulti + zp_OfficeComm + 
+                        zp_PDRInd + zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + permit_new_construction + 
+                        permit_additions_alterations_or_repairs + permit_sign + permit_demolitions + 
+                        year_property_built_na + year_property_built + supervisor_district + 
+                        Upzone_Ratio_Bin + Residential_Dummy + Historic + land_value_bin + 
+                        improvement_value_bin + Upzone_Ratio_Bin:Residential_Dummy + 
+                        Upzone_Ratio_Bin:Historic + Residential_Dummy:Historic + 
+                        Residential_Dummy:land_value_bin,
+                      data=robustness, 
+                      na.action='na.omit',
+                      family='binomial')
+summary(mod.step.final.robust)
+
+```
