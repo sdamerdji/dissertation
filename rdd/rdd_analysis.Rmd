@@ -7,6 +7,7 @@ output: html_document
 library(tidyverse)
 library(MASS)
 library(lme4)
+library(rsq)
 
 ```
 
@@ -103,8 +104,11 @@ pois.mod <- glm(Net_Units_Completed ~
                   Residential_Dummy:Historic + (dist_to_boundary + x + y + tier)^2 + assessor_neighborhood +
                   Residential_Dummy:improvement_value_bin, data=df, na.action='na.omit', family='poisson', x=TRUE)
 
-summary(pois.mod, dispersion=5.56)
+summary(pois.mod, dispersion=4.79)
 ```
+
+
+
 ```{r}
 # Phi hat is 4.52
 scaled.dev.resids <- residuals(pois.mod, type='deviance') / (1 - influence(pois.mod)$hat)
@@ -114,26 +118,9 @@ var(scaled.dev.resids[is.finite(scaled.dev.resids)])
 ```{r}
 pois.step.mod <- stepAIC(pois.mod, direction="backward", scope=list(upper=pois.mod$formula, lower=pois.base.init$formula), k=log(nrow(df)), trace=FALSE)
 
-summary(pois.step.mod, dispersion = 6.16)
+summary(pois.step.mod, dispersion = 4.79)
 ```
 
-
-```{r}
-pois.mm <- glmer(Net_Units_Completed ~ zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + 
-        zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + 
-        log1p(Envelope_1000) + 
-        use_definition + lot_code +  
-        log1p(otc.alterations.permits) + log1p(number_of_units) + 
-        Upzone_Ratio_Bin +  
-        Residential_Dummy + Historic + land_value_bin + improvement_value_bin + 
-        dist_to_boundary + x + y + tier +  
-        Residential_Dummy:Historic + dist_to_boundary:tier + 
-        Residential_Dummy:improvement_value_bin + (1 | assessor_neighborhood),
-      data = df100, 
-      family = 'poisson')
-
-summary(pois.mm)
-```
 
 ```{r}
 # Phi hat is 4.47
