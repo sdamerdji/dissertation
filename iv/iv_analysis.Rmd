@@ -13,7 +13,6 @@ df <- read.csv('./panel_fires.csv')
 df['Developed'] = df['Developed'] == 'True'
 ```
 
-
 ```{r}
 df <- df %>%
   mutate(years_since_fire = ifelse(years_since_fire < 0, NaN, years_since_fire)) %>%
@@ -26,25 +25,40 @@ df <- df[!duplicated(df[, c("MapBlkLot_Master", "year")]), ]
 
 df['val'] = df['revenue']/df['costs']
 
+
+
+df2 <- df %>%
+  arrange(MapBlkLot_Master, year) %>%
+  group_by(MapBlkLot_Master) %>%
+  mutate(Developed_Previously = cumsum(lag(Developed, default = FALSE)) > 0) %>%
+  ungroup()
+
+head(df2)
+
 ```
 
+```{r}
+non.res.df <- df %>%
+  filter(!use_definition %in% c('Multi-Family Residential', 'Single Family Residential'))
+
+nrow(non.res.df)
+non.res.pd <- pdata.frame(non.res.df, index=c("MapBlkLot_Master", "year"))
+
+```
 
 ```{r}
 pd <- pdata.frame(df, index=c("MapBlkLot_Master", "year"))
 pdim(pd)
 
-# Remove observations not measured twice
-single_step = table(index(pd)$MapBlkLot_Master)[table(index(pd)$MapBlkLot_Master) == 1]
-pd2 <- pd[!index(pd)$MapBlkLot_Master %in% names(single_step),]
 ```
+
 ### Linear Probability Model (pooled)
 
 ```{r}
 formula <- Developed ~ log1p(val) | log1p(fire_damage)
 
 # Estimate using 2SLS for panel data
-iv_model.lpm.pool <- plm::plm(formula, data = pd,
-                     model="pooling")
+iv_model.lpm.pool <- plm::plm(formula, data = pd, model="pooling", effect = 'twoway')
 ```
 
 
@@ -53,6 +67,20 @@ iv_model.lpm.pool <- plm::plm(formula, data = pd,
 summary(iv_model.lpm.pool)
 
 ```
+```{r}
+# Robust standard errors
+summary(iv_model.lpm.pool, vcov = vcovHC(iv_model.lpm.pool, type = "HC1"))
+```
+```{r}
+mean(predict(iv_model.lpm.pool) < 0)
+
+mean(predict(iv_model.lpm.pool) > 1)
+
+```
+
+```{r}
+fixef(iv_model.lpm.pool)
+```
 
 ## LPM (random effect)
 
@@ -60,7 +88,7 @@ summary(iv_model.lpm.pool)
 formula <- Developed ~ log1p(val) | log1p(fire_damage)
 
 # Estimate using 2SLS for panel data
-iv_model.random <- plm::plm(formula, data = pd2, model="random")
+iv_model.random <- plm::plm(formula, data = pd2)
 ```
 
 ```{r}
@@ -81,4 +109,13 @@ iv_model.pool <- plm::plm(formula, data = pd,
                      model="pooling")
 summary(iv_model.pool)
 
+```
+
+
+## Robustness Check
+
+```{r}
+iv_model.lpm.pool <- plm::plm(formula, data = non.res.pd,
+                              model="pooling", effect = 'twoway')
+summary(iv_model.lpm.pool)
 ```
