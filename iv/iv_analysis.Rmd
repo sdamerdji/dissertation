@@ -18,6 +18,10 @@ df <- df %>%
   mutate(years_since_fire = ifelse(years_since_fire < 0, NaN, years_since_fire)) %>%
   mutate(fire_damage = ifelse(is.nan(years_since_fire), 0, fire_damage))
 
+df[is.na(df$imputed_land_value), 'imputed_land_value'] <- mean(df$imputed_land_value, na.rm=T)
+df[is.na(df$assessed_improvement_value), 'assessed_improvement_value'] <- mean(df$assessed_improvement_value, na.rm=T)
+
+
 df['costs'] = (df['estimated_cost'] + df['imputed_land_value']
                + max(df['assessed_improvement_value'] - df['fire_damage'], 0))
 
@@ -47,7 +51,7 @@ non.res.pd <- pdata.frame(non.res.df, index=c("MapBlkLot_Master", "year"))
 ```
 
 ```{r}
-pd <- pdata.frame(df, index=c("MapBlkLot_Master", "year"))
+pd <- pdata.frame(df2, index=c("MapBlkLot_Master", "year"))
 pdim(pd)
 
 ```
@@ -58,28 +62,32 @@ pdim(pd)
 formula <- Developed ~ log1p(val) | log1p(fire_damage)
 
 # Estimate using 2SLS for panel data
-iv_model.lpm.pool <- plm::plm(formula, data = pd, model="pooling", effect = 'twoway')
+iv_model.lpm <- plm::plm(formula, data = pd, model="within", effect = 'twoway')
 ```
 
 
 ```{r}
 # Summary of the model
-summary(iv_model.lpm.pool)
+summary(iv_model.lpm)
 
 ```
+
+
 ```{r}
 # Robust standard errors
-summary(iv_model.lpm.pool, vcov = vcovHC(iv_model.lpm.pool, type = "HC1"))
-```
-```{r}
-mean(predict(iv_model.lpm.pool) < 0)
-
-mean(predict(iv_model.lpm.pool) > 1)
-
+summary(iv_model.lpm, vcov = vcovHC(iv_model.lpm, type = "HC2"))
 ```
 
+
 ```{r}
-fixef(iv_model.lpm.pool)
+mean(predict(iv_model.lpm) < 0)
+
+mean(predict(iv_model.lpm) > 1)
+
+```
+
+```{r}
+fixef(iv_model.lpm, effect='time')
 ```
 
 ## LPM (random effect)

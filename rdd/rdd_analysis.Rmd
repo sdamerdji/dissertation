@@ -8,12 +8,12 @@ library(tidyverse)
 library(MASS)
 library(lme4)
 library(rsq)
+df <- read.csv("../data/clean_fees_rdd.csv")
 
 ```
 
 
 ```{r}
-df <- read.csv("../data/clean_fees_rdd.csv")
 
 df <- dplyr::select(df, -MapBlkLot_Master, -X, -geometry)
 
@@ -31,6 +31,8 @@ df['improvement_value_bin'] = cut_number(df$assessed_improvement_value,
 
 df$x <- df$x / 100
 df$y <- df$y / 100
+df$x <- scale(df$x, scale=FALSE)
+df$y <- scale(df$y, scale=FALSE)
 
 
 df$assessor_neighborhood <- addNA(df$assessor_neighborhood)
@@ -62,16 +64,21 @@ df$Developed <- as.logical(df$Developed)
 
 ```{r}
 
-bern.mod <- glm(Developed ~ zp_DensRestMulti +  zp_OfficeComm + zp_PDRInd +
-                  zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + 
-                  zp_Redev + log1p(otc.alterations.permits) + Envelope_1000 +
-                  log1p(year_property_built) + Upzone_Ratio_Bin +
-                  Residential_Dummy  + Historic + land_value_bin + improvement_value_bin +
-                  Residential_Dummy:Historic + (dist_to_boundary * x * y * tier) +
-                  Residential_Dummy:improvement_value_bin, data=df, na.action='na.omit', family='binomial')
+bern.mod <- glm(Developed ~ zp_DensRestMulti + zp_OfficeComm + zp_PDRInd + 
+    zp_RH3_RM1 + zp_RH2 + zp_FormBasedMulti + log1p(Envelope_1000) + 
+    zp_Redev + use_definition + lot_code + percent_of_ownership + 
+    log1p(misc_exemption_value) + log1p(otc.alterations.permits) + 
+    Envelope_1000 + log1p(number_of_units) + log1p(number_of_bedrooms) + 
+    exemption_code_definition + log1p(year_property_built) + 
+    Upzone_Ratio_Bin + lot_depth + log1p(assessed_personal_property_value) + 
+    log1p(lot_area) + Residential_Dummy + Historic + land_value_bin + 
+    improvement_value_bin + Residential_Dummy:Historic + (dist_to_boundary + 
+    x + y + tier)^2 + assessor_neighborhood + Residential_Dummy:improvement_value_bin, data=df, na.action='na.omit', family='binomial')
 
 summary(bern.mod)
 ```
+
+
 ```{r}
 bern.base.init <-  glm(Developed ~ tier, data=df, na.action='na.omit', family='binomial')
 summary(bern.base.init)
@@ -81,6 +88,7 @@ summary(bern.base.init)
 
 ```{r}
 bern.step.mod <- stepAIC(bern.mod, direction="backward", scope=list(upper=bern.mod$formula, lower=bern.base.init$formula), trace=FALSE)
+rsq.kl(bern.step.mod)
 summary(bern.step.mod)
 ```
 # Poisson
