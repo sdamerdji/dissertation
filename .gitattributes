@@ -21,3 +21,4 @@ pdev/*.csv filter=lfs diff=lfs merge=lfs -text
 SF_Logistic_Data.csv filter=lfs diff=lfs merge=lfs -text
 *.csv filter=lfs diff=lfs merge=lfs -text
 .geofeather filter=lfs diff=lfs merge=lfs -text
+basic_panel.geofeather filter=lfs diff=lfs merge=lfs -text
