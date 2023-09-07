@@ -6,11 +6,117 @@ output: html_document
 ```{r}
 require(plm)
 require(tidyverse)
+library(sandwich)
+
 ```
 
 ```{r}
 df <- read.csv('./panel_fires.csv')
+df
 df['Developed'] = df['Developed'] == 'True'
+```
+
+```{r}
+cor(df$Net_Units_Completed, df$revenue, use='pairwise.complete.obs')
+cor(df$Developed, log10(1 + df$revenue), use='pairwise.complete.obs')
+
+```
+
+```{r}
+small <- df[sample(nrow(df), 10000),]
+mod.pool <- lm(log1p(Net_Units_Completed) ~ revenue + costs + revenue/costs, data=small)
+
+plot(mod.pool)
+```
+
+```{r}
+# Initialize empty named vector to hold results
+cor_results <- c()
+
+# Loop through columns
+for (i in 2:(ncol(df) - 12)) {
+  col_name <- colnames(df)[i]
+  col_data <- df[[i]]
+  
+  # Check if column is numeric or boolean
+  if (is.numeric(col_data) || is.logical(col_data)) {
+    # Calculate Pearson correlation coefficient
+    cor_value <- cor(col_data, df$Developed, method = "pearson", use='pairwise.complete.obs')
+    
+    # Store result
+    cor_results[col_name] <- cor_value
+  }
+}
+
+# Sort the results based on the absolute value of correlation
+sorted_cor_results <- cor_results[order(-abs(cor_results))]
+
+# Return the ten columns with the largest absolute correlation values
+top_10_cor_results <- head(sorted_cor_results, 12)
+
+# Print results
+print(top_10_cor_results)
+
+```
+
+
+```{r}
+# Initialize empty named vector to hold results
+cor_results <- c()
+
+isDevelopedDf <- df[df$Developed,]
+print(nrow(isDevelopedDf))
+# Loop through columns
+for (i in 2:(ncol(isDevelopedDf) - 12)) {
+  col_name <- colnames(isDevelopedDf)[i]
+  col_data <- isDevelopedDf[[i]]
+  
+  # Check if column is numeric or boolean
+  if (is.numeric(col_data) || is.logical(col_data)) {
+    # Calculate Pearson correlation coefficient
+    cor_value <- cor(col_data, isDevelopedDf$Net_Units_Completed, method = "pearson", use='pairwise.complete.obs')
+    
+    # Store result
+    cor_results[col_name] <- cor_value
+  }
+}
+
+# Sort the results based on the absolute value of correlation
+sorted_cor_results <- cor_results[order(-abs(cor_results))]
+
+# Return the ten columns with the largest absolute correlation values
+top_10_cor_results <- head(sorted_cor_results, 12)
+
+# Print results
+print(round(top_10_cor_results, 3))
+
+```
+
+
+```{r}
+aggregated_data <- df %>%
+  group_by(Residential_Dummy, Historic) %>%
+  summarise(
+    mean_Developed = mean(log1p(Net_Units_Completed)),
+    se = sqrt(var(log1p(Net_Units_Completed)) / n()),
+    lower = mean_Developed - qt(0.95, n() - 1) * se,
+    upper = mean_Developed + qt(0.95, n() - 1) * se
+  )
+
+# Create the plot
+ggplot(aggregated_data, aes(x = as.factor(Residential_Dummy), y = mean_Developed, color = as.factor(Historic))) +
+  geom_line(aes(group = as.factor(Historic))) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1) +
+  labs(
+    title = "Interaction between Existing Residential Use\nand Historic Status",
+    x = "Existing Residential Use",
+    y = "Mean log(Units Built)",
+    color = "Historic"
+  ) +
+  theme_minimal()
+
+ggsave('two_way_res_history.png', width=6, height=2.5)
 ```
 
 ```{r}
@@ -18,11 +124,12 @@ df <- df %>%
   mutate(years_since_fire = ifelse(years_since_fire < 0, NaN, years_since_fire)) %>%
   mutate(fire_damage = ifelse(is.nan(years_since_fire), 0, fire_damage))
 
+
 df[is.na(df$imputed_land_value), 'imputed_land_value'] <- mean(df$imputed_land_value, na.rm=T)
 df[is.na(df$assessed_improvement_value), 'assessed_improvement_value'] <- mean(df$assessed_improvement_value, na.rm=T)
 
 
-df['costs'] = (df['estimated_cost'] + df['imputed_land_value']
+df['costs'] = (df['construction_cost_est'] + df['imputed_land_value']
                + max(df['assessed_improvement_value'] - df['fire_damage'], 0))
 
 df <- df[!duplicated(df[, c("MapBlkLot_Master", "year")]), ]
@@ -57,6 +164,52 @@ pdim(pd)
 ```
 
 ### Linear Probability Model (pooled)
+
+```{r}
+
+first.stage.mod <- lm(log1p(val) ~ log1p(fire_damage), data=df)
+first.stage.non <- lm(log1p(val) ~ 1, data=df)
+
+
+anova(first.stage.non, first.stage.mod)
+first.stage.mod
+
+```
+
+```{r}
+# test correlation with observed confounders
+library("lmtest")
+obs.confound.mod <- lm(log1p(fire_damage) ~ Upzone_Ratio + Envelope_1000 + Residential_Dummy + zp_OfficeComm, data=df)
+
+summary(obs.confound.mod)
+
+coeftest(obs.confound.mod, vcov = vcovHC(obs.confound.mod, type = "HC0"))
+
+```
+```{r}
+coeftest(obs.confound.mod, vcov = vcovHC(obs.confound.mod, type = "HC0"))
+```
+```{r}
+df$fire_category <- df$fire_category == 'after_fire'
+
+obs.confound.mod <- glm(fire_category ~ Upzone_Ratio + Envelope_1000 + Residential_Dummy + zp_OfficeComm, data=df, family='binomial')
+
+obs.confound.mod
+```
+
+```{r}
+RSS_reduced <- sum(resid(first.stage.non)^2)
+RSS_full <- sum(resid(first.stage.mod)^2)
+
+# Calculate the partial R squared for including x2
+partial_R2 <- (RSS_reduced - RSS_full) / RSS_reduced
+partial_R2
+```
+
+```{r}
+
+```
+
 
 ```{r}
 formula <- Developed ~ log1p(val) | log1p(fire_damage)
