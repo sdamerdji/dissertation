@@ -7,15 +7,15 @@ date: "2022-12-14"
 ## Setup
 
 ```{r warning=FALSE, message=FALSE}
-library(gt)  
-library(gtsummary)
+#library(gt)  
+#library(gtsummary)
 library(tidyverse)
 library(rsq)
 library(lme4)
 library(caret)
-library(corrr)
+#library(corrr)
 library(knitr) 
-library(hdi)
+#library(hdi)
 require(gridExtra)
 library(MASS)
 ```
@@ -154,95 +154,10 @@ tex_df2
 This is 555 California Street, the fourth largest skyscraper in SF. So the large land value and property values do not seem to be bogus.
 
 
-```{r}
-df4[df4$assessed_land_value == max(df4$assessed_land_value),]
-```
-
-```{r message=FALSE}
-ggplot(df4) + 
-  geom_histogram(aes(log(1 + n_rooms)))
-```
-
-```{r message=FALSE}
-ggplot(df4) + 
-  geom_histogram(aes(homeowner_excemption_value))
-```
-
-
-```{r message=FALSE}
-ggplot(df4) + 
-  geom_histogram(aes(log(1 + basement_area)))
-```
-
-
-```{r message=FALSE}
-ggplot(df4) +
-  geom_histogram(aes(x=log(assessed_land_value + 1))) +
-  facet_grid(Developed ~ ., scales = "free_y")
-```
-
-```{r message=FALSE}
-ggplot(df4) +
-  geom_histogram(aes(x=log(assessed_improvement_value + 1))) +
-  facet_grid(Developed ~ ., scales = "free_y")
-```
-
-
-```{r}
-table(df4$tax_rate_area_code)
-```
-
 
 ### EDA
 
-```{r}
-ggplot(df4) +
-  geom_point(aes(x=log1p(property_area_in_square_feet), y=log1p(lot_area), color=Developed), alpha=1, size=.1)
 
-```
-
-This is a bad plot that distorts proportions.
-```{r}
-plot.upzone <- ggplot(df4) +
-  geom_boxplot(aes(x=Developed, y=log1p(Upzone_Ratio))) +
-  ylab('Upzone Ratio (log)')
-  theme_bw()
-
-plot.yr <- ggplot(df4[df4$year_property_built > 0,]) +
-  geom_boxplot(aes(x=Developed, y=year_property_built)) +
-  ylab('Year Property Built')
-  theme_bw()
-
-grid.arrange(plot.upzone, plot.yr, ncol=2)
-
-g <- arrangeGrob(plot.upzone, plot.yr, ncol=2)
-ggsave("./figures/eda_boxplots.png", g, height=2.5, width=7)
-```
-
-```{r}
-plot.residential <- ggplot(df4, aes(x = Developed, fill = as.factor(Residential_Dummy))) +
-  geom_bar(position = "fill")+
-  scale_y_continuous(labels = scales::percent) + 
-  ylab('Proportion') +
-  labs(fill='Residential Use') +
-  theme_bw() +
-  scale_fill_grey(start = .1, end = .9) +
-  theme(legend.position="bottom")
-
-plot.no.year <- ggplot(df4, aes(x=Developed, fill=year_property_built_na)) +
-  geom_bar(position = "fill") +
-  theme_bw() +
-  ylab('Proportion') +
-  scale_y_continuous(labels = scales::percent) +
-  #scale_fill_grey() +
-  scale_fill_grey(start = .3, end = .8) +
-  theme(legend.position="bottom")
-
-grid.arrange(plot.residential, plot.no.year, ncol=2)
-
-g <- arrangeGrob(plot.residential, plot.no.year, ncol=2)#generates g
-ggsave('./figures/eda_barplots.png', g, height=2.5, width=7)
-```
 
 
 ```{r}
@@ -316,27 +231,7 @@ ggsave('./figures/res_historic_dev.png', width=3, height=3)
 ```
 
 
-```{r}
 
-steep_res_interact_df <- df4 %>%
-  mutate(existing_residential_use = as.logical(Residential_Dummy)) %>%
-  group_by(entirely_steep_lot, existing_residential_use) %>%
-  summarise(development_rate = mean(Developed), n = n()) %>%
-  mutate(se = sqrt(as.numeric(development_rate) * (1 - as.numeric(development_rate)) / n))
-
-
-ggplot(steep_res_interact_df) + 
-  aes(x = entirely_steep_lot, 
-      color = existing_residential_use,
-      group = existing_residential_use,
-      y = development_rate)  +
-  geom_line() +
-  geom_errorbar(aes(ymin=development_rate - 1.96 * se, ymax=development_rate + 1.96 * se, width=.2)) +
-  scale_y_continuous(labels = scales::percent ) 
-
-ggsave('./figures/res_historic_dev.png', width=3, height=3)
-
-```
 
 ### Model fitting
 
@@ -381,11 +276,21 @@ summary(mod.ex.ante)
 
 
 ```{r}
-mod.step <- stepAIC(mod.ex.ante, 
-                    direction='backward', 
-                    scope=list(lower=mod.init$formula, 
-                               upper=mod.ex.ante$formula))
+mod.step.bic <- stepAIC(mod.init, 
+                        direction='forward', 
+                        scope=list(lower=mod.init$formula, 
+                                   upper=mod.ex.ante$formula), 
+                        k=log(nrow(df4)),
+                        trace=FALSE)
 
+mod.step.aic <- stepAIC(mod.init, 
+                        direction='forward', 
+                        scope=list(lower=mod.init$formula, 
+                                   upper=mod.ex.ante$formula), 
+                        k=2,
+                        trace=FALSE)
+summary(mod.step.aic)
+summary(mod.step.bic)
 ```
 
 ```{r}
