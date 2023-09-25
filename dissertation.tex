@@ -5,7 +5,7 @@
 1]{fontenc}
 \usepackage{parskip}
 \usepackage{latexsym,amsmath,amssymb}
-\usepackage{natbib}
+%\usepackage{natbib}
 \usepackage{times}
 \usepackage{zi4}
 \usepackage[a4paper,left=3cm,right=3cm,top=3cm,bottom=3cm]{geometry}
@@ -275,7 +275,7 @@ In all, my imbalanced panel dataset has N=1,531,273 observations of n=153,207 pa
 \endfoot
 
 \hline  
-\multicolumn{3}{|r|}{$^a$ Refers to permit applications filed for a parcel in the preceding 5 years.}
+\multicolumn{3}{|r|}{$^a$ Refers to permit applications filed for a parcel in the preceding 5 years.} \\
 \hline
 \endlastfoot
 
@@ -322,7 +322,7 @@ In all, my imbalanced panel dataset has N=1,531,273 observations of n=153,207 pa
 \hline
 \multirow{3}{2cm}{Property History}
 & Year Built & Year the building was built (or renovated) \\
-& Years Since Last Sale & Year of last sale which triggers \\ 
+& Years Since Last Sale & \# of years since parcel was last sold \\ 
 & Historical Status & Indicates if parcel is a historical resource\\
 \hline
 \multirow{3}{2cm}{Time Step}
@@ -608,7 +608,7 @@ where the constructed variable $R_{evenue}$ denotes the revenue gained from sell
     % Top row
     \node (bluesky) [draw, rectangle, align=center] {bluesky};
     \node (zillow) [draw, rectangle, right=of bluesky] {zillow};
-    \node (permits) [draw, rectangle, right=of zillow, shift=1cm] {permits};
+    \node (permits) [draw, rectangle, right=of zillow, xshift=1cm] {permits};
     \node (tax) [draw, rectangle, right=of permits] {tax};
     \node (topology) [draw, rectangle, right=of tax, xshift=2cm] {topology};
     
@@ -786,7 +786,7 @@ In \textbf{Figure \ref{fig:eda_barplots}}, there is evidence that properties wit
 
 \begin{figure}[hbt]
     \centering
-    \includegraphics[scale=.85]{pdev/figures/eda_barplots.png}
+    \includegraphics[scale=.1]{pdev/figures/eda_barplots.png}
     \caption{Development rates of parcels based on the existing use.}
     \label{fig:eda_barplots}
 \end{figure}
@@ -875,7 +875,7 @@ Formally, a regression-based test derived by Hausman can verify that D is endoge
 \begin{table}[bth]
     \centering
     \caption{Robust Tests for Endogeneity of $D$}
-    \begin{tabular}{|c|c|c|c|}
+    \begin{tabular}{|c|c|c|c|}\\
         \hline
         Method & Weighting & p-value & 95\% Confidence Interval \\
         \hline
@@ -889,7 +889,7 @@ Formally, a regression-based test derived by Hausman can verify that D is endoge
     \raggedright
     \medskip
     \small{Multiple robust sandwich estimators are presented to demonstrate robustness to assumptions. Arellano's method permits serial, cross-sectional correlation, while both methods permit general heteroscedasticity.}
-    \bottomrule
+    \rule{\linewidth}{0.5pt}
 \end{table}
 
 To address this endogeneity, I provide an instrumental variable (IV) estimate of the partial effect of $D$. In addition to providing an IV estimate, I also provide a regression discontinuity analysis of the average treatment effect (ATE) of $F$, a binary treatment where neighborhood-specific impact fees - where are fees levied per square foot of residential construction - are increased by 50\%. While these are separate quantities to estimate, and while the ultimate goal is to estimate the partial effect of $D$, I provide these two methods in aspirations that they provide similar estimates. In particular, I can evaluate what the estimated partial effect of $D$ would be for a decrease in the dollar amount equivalent to the fee reduction $F$ and evaluate how close that point estimate is with the point estimate for the average treatment effect (ATE) of $F$.
